@@ -112,7 +112,9 @@ function tableJournals(doc: ExtractedDocument): JournalDraft[] {
       const sourceAccounts = sourceAccountDetails(body);
       const values = amounts(body);
       if (!values.length) continue;
-      const before = page.text.slice(Math.max(rows[i - 1]?.index ?? 0, m.index! - 130), m.index!).split(/<<New>>/)[0];
+      const prefixRegion = page.text.slice(Math.max(rows[i - 1]?.index ?? 0, m.index! - 180), m.index!);
+      const previousValue = [...prefixRegion.matchAll(/-?\b\d[\d,]*\.\d{2}\b/g)].at(-1);
+      const before = prefixRegion.slice(previousValue ? previousValue.index! + previousValue[0].length : 0).replaceAll("<<New>>", "");
       const partyCode = [...before.matchAll(/\b([34]00-[A-Z]\d+)\b/g)].at(-1)?.[1] || "";
       const j = blankJournal(`source-${page.page}-${result.length + 1}`);
       j.source = "extracted"; j.reference = reference; j.rawDate = clean(m[2]); j.date = journalDate(j.rawDate);
@@ -258,6 +260,7 @@ export function buildWorksheet(doc: ExtractedDocument): AccountingWorksheet {
   const notices = ["Account codes must be matched to your company's actual AutoCount chart; suggested names are not synced accounts.", "Journal proposals require review of source evidence, recognition, tax and the financial period. No transaction is posted automatically."];
   if (training) notices.unshift("Training/course material detected. Examples are shown for analysis, not as evidence of actual company transactions. Placeholder years are intentionally left blank.");
   if (!journals.length) notices.push("No reliable transaction rows were identified. Read the source text below, supply a clearer transaction document, or enter a journal manually. Product prices and setup instructions are not transaction totals.");
+  if (!journals.length && doc.quality.is_scanned) notices.push("The document may be an image or scanned pages. Image OCR is not configured: compare the original file and transcribe verified transactions, or provide a machine-readable source.");
   return { version: 1, sourceKind: training ? "training_material" : journals.length ? "business_document" : "unstructured", businessEvidenceConfirmed: false, financialYear: "", journals, notices, generatedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
 }
 

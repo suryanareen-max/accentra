@@ -37,6 +37,13 @@ test("multi-transaction teaching documents keep separate proposals and leave omi
   assert.equal(w.journals[0].date, ""); assert.match(w.journals[0].treatment, /not sales revenue/);
   assert.equal(w.businessEvidenceConfirmed, false); assert.ok(worksheetIssues(w).length);
 });
+test("one transaction's capital contribution does not contaminate the next cash-sale treatment", () => {
+  const doc = extractText("Course Book\nOwner Initial Capital <<New>> OR-900001 05 Jan CIMB-KL 100-0000 Capital 100,000.00\nCash Customer Cash Sales <<New>> OR-900002 06 Jan CASH 500-1000 Cash Sales 10,000.00", "chapter.pdf");
+  const w = buildWorksheet(doc);
+  assert.match(w.journals[0].treatment, /Owner contributions/);
+  assert.match(w.journals[1].treatment, /Recognise revenue/);
+  assert.doesNotMatch(w.journals[1].evidence.excerpt, /100,000/);
+});
 test("a multi-line source journal retains each account and proposes a balanced partition", () => {
   const w = buildWorksheet(extractText("Course Book\nJV-900001 12 Jan\n905-0000 Travelling 300.00\n909-0000 Telephone 50.00\n905-0000 Meeting 150.00\n905-0000 Mileage 250.00\n310-CIMB Bank 250.00\n320-0000 Cash 1,000.00", "chapter.pdf"));
   const j = w.journals[0]; assert.equal(j.lines.length, 6); assert.equal(j.amount, 1000);

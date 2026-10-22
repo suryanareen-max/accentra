@@ -15,10 +15,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const bytes = await readDocumentFile(id);
     const pdf = record.contentType === "application/pdf" ? await extractPdf(bytes) : null;
     const spreadsheet = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"].includes(record.contentType) ? extractSpreadsheet(bytes, record.filename) : null;
-    const text = pdf?.text ?? spreadsheet?.text ?? (record.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ? await extractDocx(bytes) : new TextDecoder().decode(bytes));
+    const image = record.contentType.startsWith("image/");
+    const text = pdf?.text ?? spreadsheet?.text ?? (record.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ? await extractDocx(bytes) : image ? "" : new TextDecoder().decode(bytes));
     const extracted = record.contentType === "text/csv" ? extractCsv(text) : extractText(text, record.filename);
     if (pdf) { extracted.quality.pages = pdf.pages; extracted.source_pages = pdf.sourcePages; }
     if (spreadsheet) extracted.source_rows = spreadsheet.rows;
+    if (image || (pdf && !pdf.text.trim())) extracted.quality.is_scanned = true;
     const next = await updateDocument(id, { state: "NEEDS_REVIEW", extracted, worksheet: undefined, classified: undefined, validation: undefined });
     return Response.json({ document: next, agent: { name: "Document Reader", version: "reader-v1-local", mode: "deterministic-fallback" } });
   } catch (error) {
