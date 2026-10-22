@@ -2,6 +2,7 @@
   "name": "web",
   "private": true,
   "scripts": {
+    "test": "tsx --test tests/*.test.ts",
     "dev": "next dev",
     "build": "next build",
     "lint": "next lint",
@@ -29,6 +30,7 @@
     "@types/react-dom": "^19.0.0",
     "dotenv": "^18.0.8",
     "drizzle-kit": "^0.31.11",
+    "tsx": "4.20.6",
     "typescript": "^5.0.0"
   }
 }

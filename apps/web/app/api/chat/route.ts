@@ -1,9 +1,20 @@
 import { getDocument, listDocuments } from "../../../lib/document-store";
 import { adapterStatus } from "../../../lib/autocount";
+import { journalIssues, journalTotals } from "../../../lib/accounting-worksheet";
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as { message?: string; mode?: "books" | "standards" | "document"; documentId?: string } | null; const message = body?.message?.trim(); if (!message) return Response.json({ error: "message is required" }, { status: 400 });
   if (body?.mode === "document") {
     const document = body.documentId ? await getDocument(body.documentId) : undefined;
+    if (document?.worksheet) {
+      const worksheet = document.worksheet;
+      const named = worksheet.journals.filter((j) => j.reference && message.toLowerCase().includes(j.reference.toLowerCase()));
+      const selected = named.length ? named : worksheet.journals.slice(0, 4);
+      const detail = selected.map((j) => {
+        const totals = journalTotals(j); const issues = journalIssues(j);
+        return `${j.reference || "New journal"} · ${j.date || `Date incomplete (${j.rawDate || "not in source"})`} · ${j.currency || "Currency unconfirmed"} ${j.amount?.toFixed(2) || "amount unconfirmed"}\n${j.lines.map((l) => `${l.debit > 0 ? "Dr" : "Cr"} ${l.accountCode || "[map account]"} ${l.accountName}: ${(l.debit || l.credit).toFixed(2)}`).join("\n")}\nDebit total ${totals.debit.toFixed(2)}; credit total ${totals.credit.toFixed(2)}; difference ${totals.difference.toFixed(2)}.\nTreatment: ${j.treatment}\nEvidence: page ${j.evidence.page}. ${issues.length ? `Needs review: ${issues.join(" ")}` : "Arithmetic checks pass; confirm business evidence and account mapping before posting."}`;
+      }).join("\n\n");
+      return Response.json({ answer: `${worksheet.journals.length} separate journal proposal(s) were identified in ${document.filename}. ${worksheet.sourceKind === "training_material" ? "This is training material, so the examples are not evidence of actual company transactions. " : ""}${detail || "No reliable dated transaction rows were identified. Product setup information and price lists do not establish accounting transactions."}\n\n${!named.length && worksheet.journals.length > 4 ? "The first four journals are summarised here; ask using a specific document reference or use the transaction register for the complete workpaper. " : ""}These are source-linked, rule-based proposals. Resolve missing dates, taxes and actual AutoCount accounts in the worksheet; only saved, reviewed journals can be sent.`, mode: "document", documentId: document.id, standards: selected.flatMap((j) => j.standards) });
+    }
     if (!document?.extracted || !document.classified) return Response.json({ error: "This document must finish extraction and classification first." }, { status: 400 });
     const findings = document.validation?.findings ?? [];
     const entryText = document.classified.entries.map((entry) => `${entry.dr ? "Dr" : "Cr"} ${entry.acc_no} ${entry.acc_name} RM ${(entry.dr || entry.cr).toFixed(2)}`).join("; ");

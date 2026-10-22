@@ -5,7 +5,7 @@ import { accountBooks, documents, tenants } from "./db/schema";
 import { getDb } from "./db";
 import { readDocumentFile as readStoredDocumentFile, saveDocumentFile as saveStoredDocumentFile } from "./storage";
 
-type DocumentMetadata = Pick<DocumentRecord, "extracted" | "classified" | "validation" | "error">;
+type DocumentMetadata = Pick<DocumentRecord, "extracted" | "classified" | "validation" | "error" | "worksheet">;
 
 async function getDemoTenantId() {
   const db = getDb();
@@ -53,6 +53,7 @@ export async function createDocument(input: Omit<DocumentRecord, "state" | "crea
       classified: input.classified,
       validation: input.validation,
       error: input.error,
+      worksheet: input.worksheet,
     },
   }).returning();
   return toRecord(row);
@@ -78,6 +79,7 @@ export async function updateDocument(id: string, patch: Partial<DocumentRecord>)
       classified: next.classified,
       validation: next.validation,
       error: next.error,
+      worksheet: next.worksheet,
     },
   }).where(eq(documents.id, id)).returning();
   return row ? toRecord(row) : undefined;

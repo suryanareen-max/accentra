@@ -10,6 +10,9 @@ export type Field<T> = {
 };
 
 export type ExtractedDocument = {
+  source_text?: string;
+  source_pages?: Array<{ page: number; text: string }>;
+  source_rows?: Array<Record<string, string>>;
   doc_family: "SALES_INVOICE" | "PURCHASE_INVOICE" | "RECEIPT" | "PAYMENT_VOUCHER" | "BANK_STATEMENT" | "UNKNOWN";
   supplier: { name: Field<string>; tax_id: Field<string>; address: Field<string>; phone: Field<string>; email: Field<string> };
   customer: { name: Field<string>; tax_id: Field<string>; address: Field<string> };
@@ -31,6 +34,22 @@ export type DocumentRecord = {
   classified?: ClassifiedTransaction;
   validation?: ValidationReport;
   error?: string;
+  worksheet?: AccountingWorksheet;
+};
+
+export type JournalLine = { accountCode: string; accountName: string; description: string; debit: number; credit: number; taxCode: string; department: string };
+export type JournalDraft = {
+  id: string; reference: string; date: string; rawDate: string; currency: string; currencyRate: number;
+  party: string; description: string; kind: string; recommendedModule: string;
+  amount: number | null; taxAmount: number | null; taxTreatment: string;
+  lines: JournalLine[]; treatment: string; standards: Array<{ label: string; url: string }>;
+  evidence: { page: number; excerpt: string }; assumptions: string[];
+  included: boolean; confirmed: boolean; approvedAt?: string; source: "extracted" | "manual";
+};
+export type AccountingWorksheet = {
+  version: 1; sourceKind: "business_document" | "training_material" | "unstructured";
+  businessEvidenceConfirmed: boolean; financialYear: string; journals: JournalDraft[];
+  notices: string[]; generatedAt: string; updatedAt: string;
 };
 
 export type Account = { accNo: string; accName: string; type: "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE"; postable: boolean };

@@ -1,2 +1,7 @@
-import { getPosting } from "../../../../../lib/posting-store";
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) { const posting = getPosting((await params).id); if (!posting) return Response.json({ error: "Posting not found" }, { status: 404 }); return Response.json({ posting, message: "Retry requires a pre-check; no blind POST was issued." }, { status: 409 }); }
+import { eq } from "drizzle-orm";
+import { getDb } from "../../../../../lib/db";
+import { postings } from "../../../../../lib/db/schema";
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const [posting] = await getDb().select().from(postings).where(eq(postings.id, (await params).id));
+  return Response.json(posting ? { posting, error: "Verify this reference in AutoCount first. An ambiguous submission cannot be blindly retried." } : { error: "Posting not found" }, { status: posting ? 409 : 404 });
+}
