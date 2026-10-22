@@ -75,3 +75,13 @@ The database client is in `apps/web/lib/db`. Update the schema there, then run `
 ---
 
 *Plan authored 20 Oct 2026. Supersede by editing `ACCENTRA-AI-PLAN.md` and bumping the version in its header.*
+
+### DeepSeek document analysis
+
+Set `DEEPSEEK_API_KEY` as an encrypted server environment variable and `DEEPSEEK_MODEL=deepseek-flash` in Vercel (and in `apps/web/.env.local` for development), then redeploy. Never use a `NEXT_PUBLIC_` prefix for the key.
+
+On a document review, use **Analyse with DeepSeek**. The analyst receives extracted source text with page labels, saved journal proposals, arithmetic checks and unresolved validation issues. Chat attachments are uploaded, extracted and analysed automatically; follow-up questions retain that document context. Text-based PDF, Excel, CSV and Word `.docx` files are supported by extraction. Images/scanned PDFs require OCR; missing text returns an actionable error instead of invented findings.
+
+The default standards search calls DeepSeek's `/v1/tools/search` with generic accounting topics only. Retrieved references are restricted to IFRS, MASB and MIA HTTPS domains and shown beside the answer. Search outages are disclosed; guidance is advisory and does not imply access to the full standards corpus. Disable the search checkbox to analyse document evidence without a web lookup. Source text and the conversation are sent to DeepSeek; private names and document text are never sent as public search queries.
+
+The analyst is read-only: it cannot save, confirm, approve or send entries. Use the accountant workpaper to review and save changes; existing validation and approval requirements still control AutoCount posting. Provider authentication, balance, timeout and rate-limit failures are reported explicitly.

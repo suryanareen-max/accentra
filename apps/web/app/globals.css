@@ -166,3 +166,12 @@ h1 { font-size: 32px; letter-spacing: -0.045em; margin: 0; }
 @media(max-width:650px){.workpaper-main{padding:18px 12px}.workpaper-topbar{padding:16px 12px;gap:15px;flex-wrap:wrap}.workpaper-summary{grid-template-columns:1fr 1fr}.journal-fields{grid-template-columns:1fr 1fr}.workpaper h1{font-size:26px}.journal-tax,.journal-submit{flex-direction:column;align-items:stretch}.journal-submit .doc-meta{max-width:none}.workpaper-year{flex-wrap:wrap}.workpaper .section-head{gap:14px;flex-wrap:wrap}}
 .transaction-register{width:100%;min-width:1000px;border-collapse:collapse;font-size:12px}.transaction-register th{padding:13px;text-align:left;background:#edf5ef;color:#4a6754}.transaction-register td{padding:13px;border-top:1px solid #e2ebe5;font-variant-numeric:tabular-nums}.transaction-register td:nth-child(n+4){text-align:right}.transaction-register td:last-child{text-align:left}.transaction-register a{color:#24744a;font-weight:600}.journal-paper{scroll-margin-top:20px}
 .workpaper-main{width:100%;box-sizing:border-box}.workpaper,.workpaper>*{min-width:0}.journal-paper,.journal-table-wrap{min-width:0;max-width:100%}
+
+.analysis-result .chat-answer { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; }
+.analysis-turn { padding: 20px 0; border-bottom: 1px solid var(--line, #dfe7e1); }
+.analysis-search { display: flex; align-items: center; gap: 9px; font-size: 13px; padding: 14px 0; }
+.analysis-search input { width: auto; }
+.analysis-sources { display: grid; gap: 8px; margin-top: 20px; font-size: 13px; }
+.analysis-sources a { color: #176d53; overflow-wrap: anywhere; }
+.analysis-warning { padding: 12px; border-radius: 6px; background: #fff3df; color: #71470d; font-size: 13px; }
+.analysis-attachment { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 16px; background: #eaf4ee; }

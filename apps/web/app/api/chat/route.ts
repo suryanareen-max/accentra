@@ -1,26 +1,21 @@
 import { getDocument, listDocuments } from "../../../lib/document-store";
-import { adapterStatus } from "../../../lib/autocount";
-import { journalIssues, journalTotals } from "../../../lib/accounting-worksheet";
+import { analyseWithDeepSeek, DeepSeekError, type ConversationTurn } from "../../../lib/deepseek";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null) as { message?: string; mode?: "books" | "standards" | "document"; documentId?: string } | null; const message = body?.message?.trim(); if (!message) return Response.json({ error: "message is required" }, { status: 400 });
-  if (body?.mode === "document") {
-    const document = body.documentId ? await getDocument(body.documentId) : undefined;
-    if (document?.worksheet) {
-      const worksheet = document.worksheet;
-      const named = worksheet.journals.filter((j) => j.reference && message.toLowerCase().includes(j.reference.toLowerCase()));
-      const selected = named.length ? named : worksheet.journals.slice(0, 4);
-      const detail = selected.map((j) => {
-        const totals = journalTotals(j); const issues = journalIssues(j);
-        return `${j.reference || "New journal"} · ${j.date || `Date incomplete (${j.rawDate || "not in source"})`} · ${j.currency || "Currency unconfirmed"} ${j.amount?.toFixed(2) || "amount unconfirmed"}\n${j.lines.map((l) => `${l.debit > 0 ? "Dr" : "Cr"} ${l.accountCode || "[map account]"} ${l.accountName}: ${(l.debit || l.credit).toFixed(2)}`).join("\n")}\nDebit total ${totals.debit.toFixed(2)}; credit total ${totals.credit.toFixed(2)}; difference ${totals.difference.toFixed(2)}.\nTreatment: ${j.treatment}\nEvidence: page ${j.evidence.page}. ${issues.length ? `Needs review: ${issues.join(" ")}` : "Arithmetic checks pass; confirm business evidence and account mapping before posting."}`;
-      }).join("\n\n");
-      return Response.json({ answer: `${worksheet.journals.length} separate journal proposal(s) were identified in ${document.filename}. ${worksheet.sourceKind === "training_material" ? "This is training material, so the examples are not evidence of actual company transactions. " : ""}${detail || "No reliable dated transaction rows were identified. Product setup information and price lists do not establish accounting transactions."}\n\n${!named.length && worksheet.journals.length > 4 ? "The first four journals are summarised here; ask using a specific document reference or use the transaction register for the complete workpaper. " : ""}These are source-linked, rule-based proposals. Resolve missing dates, taxes and actual AutoCount accounts in the worksheet; only saved, reviewed journals can be sent.`, mode: "document", documentId: document.id, standards: selected.flatMap((j) => j.standards) });
-    }
-    if (!document?.extracted || !document.classified) return Response.json({ error: "This document must finish extraction and classification first." }, { status: 400 });
-    const findings = document.validation?.findings ?? [];
-    const entryText = document.classified.entries.map((entry) => `${entry.dr ? "Dr" : "Cr"} ${entry.acc_no} ${entry.acc_name} RM ${(entry.dr || entry.cr).toFixed(2)}`).join("; ");
-    return Response.json({ answer: `Analysis for ${document.filename}: classified as ${document.extracted.doc_family.replaceAll("_", " ")}. Proposed entries: ${entryText || "none"}. ${findings.length ? `${findings.length} validation finding(s) require review: ${findings.slice(0, 2).map((finding) => finding.message).join("; ")}.` : "No validation findings are currently recorded."} ${/ifrs|mfrs|standard|policy|accounting/i.test(message) ? "The IFRS/MFRS treatment is advisory and must be confirmed against the applicable reporting framework, entity policy, tax treatment, and source evidence before posting." : "Ask about the classification, evidence, missing fields, or proposed entries for this document."}`, mode: "document", documentId: document.id, entries: document.classified.entries, findings, standards: ["IFRS/MFRS review is advisory", "Human approval is required before AutoCount posting"] });
+  try {
+    const body = await request.json().catch(() => null);
+    if (typeof body?.message !== "string" || !body.message.trim() || body.message.length > 4000) return Response.json({ error: "Enter a question of up to 4,000 characters." }, { status: 400 });
+    const mode = body.mode === "document" ? "document" : body.mode === "standards" ? "standards" : "books";
+    const document = mode === "document" && typeof body.documentId === "string" ? await getDocument(body.documentId) : undefined;
+    if (mode === "document" && !document) return Response.json({ error: "Document not found. Upload or select a document first." }, { status: 404 });
+    if (document && !document.extracted?.source_text?.trim()) return Response.json({ error: "This file has no readable extracted text. Re-read it, or upload a text-based PDF, Excel, CSV or Word (.docx) file. Scanned pages need OCR before analysis." }, { status: 422 });
+    const history: ConversationTurn[] = Array.isArray(body.history) ? body.history.slice(-8).filter((turn: ConversationTurn) => (turn?.role === "user" || turn?.role === "assistant") && typeof turn.content === "string").map((turn: ConversationTurn) => ({ role: turn.role, content: turn.content.slice(0, 6000) })) : [];
+    const result = await analyseWithDeepSeek({ message: body.message.trim(), document, documents: mode === "books" ? await listDocuments() : [], history, search: body.search !== false });
+    return Response.json({ ...result, mode, documentId: document?.id }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    if (error instanceof DeepSeekError) return Response.json({ error: error.message, code: error.code }, { status: error.status });
+    console.error("Accounting analysis failed", error instanceof Error ? error.name : "UnknownError");
+    return Response.json({ error: "Analysis could not be completed. Please retry." }, { status: 500 });
   }
-  const docs = await listDocuments(); const posted = docs.filter((doc) => doc.validation?.postable).length;
-  if (body?.mode === "standards") return Response.json({ answer: "MFRS and IFRS guidance is advisory here. Connect the standards corpus before relying on clause-level conclusions for a client decision.", citations: [{ standard: "MFRS/IFRS corpus", reference: "Pending corpus connection", source_url: "https://www.mia.org.my" }], mode: "standards" });
-  return Response.json({ answer: `The local book mirror contains ${docs.length} documents, with ${posted} currently passing deterministic validation. AutoCount adapter status: ${adapterStatus().adapter}. I can only answer from records available in the mirror.`, citations: [{ standard: "Accentra book mirror", reference: "document and validation records", source_url: "/api/documents" }], mode: "books", trace: { documentCount: docs.length, validatedCount: posted } });
 }
