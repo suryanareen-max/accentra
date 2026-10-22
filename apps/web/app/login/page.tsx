@@ -1,15 +1,5 @@
-import Link from "next/link";
-import { AuthView } from "@neondatabase/auth-ui";
+import { AuthScreen } from "../components/auth-screen";
 
 export default function Login() {
-  return (
-    <main className="login-page">
-      <section className="login-story">
-        <Link href="/" className="brand login-brand">accentra<span>·</span>ai</Link>
-        <div className="login-story-content"><span className="hero-kicker"><span className="live-dot" /> YOUR WORKSPACE, IN GOOD SHAPE</span><h1>Good books.<br /><em>Clear head.</em></h1><p>Bring the busywork into focus, and keep every important decision in your hands.</p><div className="login-decoration"><div className="login-orbit login-orbit-a" /><div className="login-orbit login-orbit-b" /><div className="login-glass glass-back" /><div className="login-glass glass-mid" /><div className="login-glass glass-front"><span>a.</span></div><div className="login-sparkle">✳</div></div></div>
-        <div className="login-story-foot"><span>THOUGHTFUL ACCOUNTING AUTOMATION</span><span>01 — 03</span></div>
-      </section>
-      <section className="login-form-side"><div className="login-form-wrap"><Link href="/" className="back-home">← <span>Back to home</span></Link><div className="form-heading"><span className="form-eyebrow">WELCOME BACK</span><h2>Good to see you.</h2><p>Sign in to pick up where you left off.</p></div><AuthView path="sign-in" /></div><footer className="login-footer"><span>© 2026 Accentra AI</span><a href="mailto:hello@accentra.ai">Need help?</a></footer></section>
-    </main>
-  );
+  return <AuthScreen path="sign-in" />;
 }
