@@ -11,7 +11,11 @@ export async function postToAutoCount(endpoint: string, payload: ClassifiedTrans
   const apiKey = process.env.AUTCOUNT_API_KEY;
   const keyId = process.env.AUTCOUNT_KEY_ID;
   if (apiKey) {
+<<<<<<< HEAD
     const authHeaders = keyId ? { "API-Key": apiKey, "Key-ID": keyId } : { authorization: `Bearer ${apiKey}` };
+=======
+    const authHeaders: Record<string, string> = keyId ? { "API-Key": apiKey, "Key-ID": keyId } : { authorization: `Bearer ${apiKey}` };
+>>>>>>> d8656a8 (Configure AutoCount key ID authentication)
     const response = await fetch(`${baseUrl}/${endpoint}`, { method: "POST", headers: { ...authHeaders, "content-type": "application/json", "idempotency-key": idempotencyKey }, body: JSON.stringify(payload) });
     const body = await response.json().catch(() => null);
     if (!response.ok) throw new Error(body?.message ?? `AutoCount returned HTTP ${response.status}`);
