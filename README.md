@@ -62,6 +62,15 @@ pnpm dev
 
 The first runnable slice lives in `apps/web`: an Accentra dashboard with the review queue, upload entry point, book-health summary, and `/api/health` liveness route. It uses representative data until the database, authentication, storage, job runner, and AutoCount sandbox credentials are connected.
 
+### Connect Neon Postgres
+
+1. Copy the pooled connection string from your Neon project.
+2. Create `apps/web/.env.local` and add `DATABASE_URL="<your pooled connection string>"`. Keep this secret out of Git.
+3. From the repository root, run `pnpm --filter web db:migrate` to create the tables in `apps/web/lib/db/schema.ts`.
+4. Start the app and open `/api/health/database`; a successful response has `{"status":"ok","database":"neon"}`.
+
+The database client is in `apps/web/lib/db`. Update the schema there, then run `pnpm --filter web db:generate` followed by `pnpm --filter web db:migrate` to apply schema changes.
+
 ---
 
 *Plan authored 20 Oct 2026. Supersede by editing `ACCENTRA-AI-PLAN.md` and bumping the version in its header.*

@@ -1,5 +1,5 @@
-import { UploadCard } from "../components/upload-card";
-import { BookChat } from "../components/book-chat";
+import { UploadCard } from "../../components/upload-card";
+import { BookChat } from "../../components/book-chat";
 
 const queue = [
   { name: "INV-2026-1048.pdf", vendor: "Tenaga Supplies Sdn Bhd", meta: "Uploaded 8 min ago · 2 pages", amount: "RM 4,200.00", status: "Needs review", tone: "amber" },
