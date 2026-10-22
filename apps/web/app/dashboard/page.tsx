@@ -7,29 +7,34 @@ const queue = [
   { name: "PV-00391.jpg", vendor: "Kencana Office Systems", meta: "Uploaded yesterday · 1 page", amount: "RM 860.00", status: "Ready to post", tone: "green" },
 ];
 
+const kpis = [
+  ["SALES", "RM 24,810", "Last 30 days", "↑ 12% vs September"],
+  ["INVOICES", "12 invoices", "7 unpaid · 5 paid", "RM 18,430 outstanding"],
+  ["QUOTATIONS", "7 quotations", "3 pending · 4 closed", "RM 31,200 total deal"],
+  ["PROFIT AND LOSS", "RM 8,420", "Net income this month", "Income RM 24,810 · Expenses RM 16,390"],
+  ["COST AND EXPENSES", "RM 16,390", "Last 30 days", "Utilities up 8.4%"],
+  ["BANK ACCOUNTS", "RM 48,620.00", "Cash at bank", "Cash in hand RM 2,400.00"],
+];
+
 export default function Home() {
-  return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="brand">accentra<span>·</span>ai</div>
-        <nav className="nav" aria-label="Main navigation">
-          <a className="active" href="#dashboard">Overview</a><a href="#inbox">Inbox <small>12</small></a><a href="/post-queue">Post queue</a><a href="/chat">Ask the books</a><a href="#reports">Reports</a><a href="#settings">Settings</a>
-        </nav>
-        <div className="tenant"><strong>Horizon & Co.</strong>Cloud Accounting · Live book<br />Last sync 11 minutes ago</div>
-      </aside>
-      <main className="main" id="dashboard">
-        <header className="topbar"><div><div className="eyebrow">Wednesday, 21 October 2026</div><h1>Good morning, Aina</h1></div><div className="user"><span>Reviewer · Horizon &amp; Co.</span><div className="avatar">AN</div></div></header>
-        <section className="grid stats" aria-label="Book summary">
-          <div className="card stat"><span className="label">Needs your review</span><span className="value">12</span><span className="delta">3 high confidence · 9 to check</span></div>
-          <div className="card stat"><span className="label">Ready to post</span><span className="value">7</span><span className="delta">RM 24,810.00 total</span></div>
-          <div className="card stat"><span className="label">Posted this month</span><span className="value">184</span><span className="delta">↑ 12% vs September</span></div>
-          <div className="card stat"><span className="label">Book health</span><span className="value">Good</span><span className="delta">No unreconciled records</span></div>
-        </section>
-        <section className="grid workspace">
-          <div className="card section" id="inbox"><div className="section-head"><h2>Review queue</h2><a className="link" href="#queue">View all →</a></div><div className="queue">{queue.map((item) => <div className="queue-row" key={item.name}><div><div className="doc-title">{item.name}</div><div className="doc-meta">{item.vendor} · {item.meta}</div></div><span className={`pill ${item.tone}`}>{item.status}</span><span className="amount">{item.amount}</span></div>)}</div><p className="footer-note">AI suggestions are advisory. Nothing posts until a reviewer approves it.</p></div>
-          <div className="grid"><UploadCard /><div className="card section" id="chat"><div className="section-head"><h2>One thing to know</h2><a className="link" href="#chat">Ask the books →</a></div><div className="insight"><strong>Utilities are up 8.4% this month</strong><p>Driven by three invoices from Tenaga Supplies. Each figure is linked to the posted books.</p></div><div className="insight"><strong>One vendor needs attention</strong><p>Bank details on INV-2026-1048 differ from the vendor master. Review before posting.</p></div><BookChat /></div></div>
-        </section>
+  return <div className="accounting-shell">
+    <aside className="accounting-sidebar">
+      <div className="accounting-logo"><span>a</span><strong>accentra<span>·</span>ai</strong></div>
+      <div className="company-name">Horizon &amp; Co.</div>
+      <nav aria-label="Accounting navigation" className="accounting-nav">
+        {[["▣", "Dashboard", true], ["▤", "Sales"], ["♛", "Purchase"], ["▣", "Accounting"], ["◇", "Stock"], ["%", "Tax"], ["⚒", "Tools"]].map(([icon, label, active]) => <a className={active ? "active" : ""} href={label === "Dashboard" ? "/dashboard" : `#${String(label).toLowerCase()}`} key={String(label)}><span>{icon}</span>{label}<b>›</b></a>)}
+      </nav>
+      <div className="accounting-sidebar-foot">Cloud Accounting<br /><small>Last sync a few seconds ago</small></div>
+    </aside>
+    <div className="accounting-content">
+      <header className="accounting-topbar"><button className="menu-button" aria-label="Open menu">☰</button><strong>Horizon &amp; Co.</strong><div className="top-search">⌕ &nbsp; Search...</div><div className="top-actions">?　♧　▦　⚙　 <span>Aina Raj</span><i>AR</i></div></header>
+      <main className="accounting-main">
+        <div className="accounting-heading"><div className="company-placeholder">▧</div><h1>Horizon &amp; Co.</h1></div>
+        <section className="autocount-kpis">{kpis.map(([title, value, sub, detail]) => <article className="autocount-card" key={title}><div className="autocount-card-title">{title}<span>⌄</span></div><strong>{value}</strong><small>{sub}</small><p>{detail}</p></article>)}</section>
+        <section className="documents-panel"><div className="section-head"><div><h2>Transaction documents</h2><p>Upload invoices, receipts, bank statements, and vouchers to record them in your book.</p></div><a href="#inbox" className="link">View all →</a></div><div className="documents-grid"><div className="queue">{queue.map((item) => <div className="queue-row" key={item.name}><div><div className="doc-title">{item.name}</div><div className="doc-meta">{item.vendor} · {item.meta}</div></div><span className={`pill ${item.tone}`}>{item.status}</span><span className="amount">{item.amount}</span></div>)}</div><UploadCard /></div><p className="footer-note">AI suggestions are advisory. Nothing posts until a reviewer approves it.</p></section>
+        <section className="card section accounting-insight" id="chat"><div className="section-head"><h2>Book insights</h2><a className="link" href="#chat">Ask the books →</a></div><BookChat /></section>
       </main>
     </div>
-  );
+  </div>;
 }
+

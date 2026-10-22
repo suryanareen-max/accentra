@@ -1,13 +1,11 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { desc, eq } from "drizzle-orm";
 import type { DocumentRecord, SupportedMime } from "./contracts";
 import { accountBooks, documents, tenants } from "./db/schema";
 import { getDb } from "./db";
+import { readDocumentFile as readStoredDocumentFile, saveDocumentFile as saveStoredDocumentFile } from "./storage";
 
 type DocumentMetadata = Pick<DocumentRecord, "extracted" | "classified" | "validation" | "error">;
-const dataDir = path.join(process.cwd(), ".data", "documents");
 
 async function getDemoTenantId() {
   const db = getDb();
@@ -85,12 +83,11 @@ export async function updateDocument(id: string, patch: Partial<DocumentRecord>)
   return row ? toRecord(row) : undefined;
 }
 
-export async function saveDocumentFile(id: string, bytes: Uint8Array) {
-  await mkdir(dataDir, { recursive: true });
-  await writeFile(path.join(dataDir, id), bytes);
+export async function saveDocumentFile(id: string, bytes: Uint8Array, contentType?: string) {
+  return saveStoredDocumentFile(id, bytes, contentType);
 }
 
-export async function readDocumentFile(id: string) { return readFile(path.join(dataDir, id)); }
+export async function readDocumentFile(id: string) { return readStoredDocumentFile(id); }
 export function contentHash(bytes: Uint8Array) { return createHash("sha256").update(bytes).digest("hex"); }
 
 export async function listDocuments() {

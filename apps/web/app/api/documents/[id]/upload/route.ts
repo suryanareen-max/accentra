@@ -8,7 +8,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!(file instanceof File)) return Response.json({ error: "file is required" }, { status: 400 });
   if (file.size > MAX_FILE_BYTES) return Response.json({ error: "Files must be 50 MB or smaller." }, { status: 413 });
   const bytes = new Uint8Array(await file.arrayBuffer());
-  await saveDocumentFile(id, bytes);
+  await saveDocumentFile(id, bytes, record.contentType);
   const next = await updateDocument(id, { size: file.size, contentType: record.contentType, contentHash: contentHash(bytes) });
   return Response.json({ document: next });
 }
