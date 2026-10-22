@@ -6,7 +6,7 @@ import type { ClassifiedTransaction } from "../../../lib/contracts";
 
 export async function GET() { return Response.json({ postings: listPostings() }); }
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null) as { documentId?: string } | null; const document = body?.documentId ? getDocument(body.documentId) : undefined;
+  const body = await request.json().catch(() => null) as { documentId?: string } | null; const document = body?.documentId ? await getDocument(body.documentId) : undefined;
   if (!document?.classified || !document.validation) return Response.json({ error: "A classified and validated document is required." }, { status: 400 });
   if (!document.validation.postable) return Response.json({ error: "Blocking validation findings must be resolved before posting." }, { status: 409 });
   if (getReview(document.id).state !== "APPROVED") return Response.json({ error: "A reviewer must approve this document before posting." }, { status: 409 });

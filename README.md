@@ -65,11 +65,12 @@ The first runnable slice lives in `apps/web`: an Accentra dashboard with the rev
 ### Connect Neon Postgres
 
 1. Copy the pooled connection string from your Neon project.
-2. Create `apps/web/.env.local` and add `DATABASE_URL="<your pooled connection string>"`. Keep this secret out of Git.
-3. From the repository root, run `pnpm --filter web db:migrate` to create the tables in `apps/web/lib/db/schema.ts`.
-4. Start the app and open `/api/health/database`; a successful response has `{"status":"ok","database":"neon"}`.
+2. Copy the Neon Auth URL from your Neon project.
+3. Create `apps/web/.env.local` with `DATABASE_URL="<your pooled connection string>"`, `NEON_AUTH_BASE_URL="<your Neon Auth URL>"`, and `NEXT_PUBLIC_NEON_AUTH_URL="<your Neon Auth URL>"`. Generate a private 32-character-or-longer `NEON_AUTH_COOKIE_SECRET` and keep the file out of Git.
+4. From the repository root, run `pnpm --filter web db:migrate` to create the tables in `apps/web/lib/db/schema.ts`.
+5. Start the app and open `/api/health/database`; a successful response has `{"status":"ok","database":"neon"}`.
 
-The database client is in `apps/web/lib/db`. Update the schema there, then run `pnpm --filter web db:generate` followed by `pnpm --filter web db:migrate` to apply schema changes.
+The database client is in `apps/web/lib/db`. Update the schema there, then run `pnpm --filter web db:generate` followed by `pnpm --filter web db:migrate` to apply schema changes. Neon Auth handles sign-in and sessions through the Neon Auth URL; its server routes are protected and send unauthenticated users to `/login`.
 
 ---
 
