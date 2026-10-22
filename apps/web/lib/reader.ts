@@ -1,6 +1,5 @@
 import type { ExtractedDocument } from "./contracts";
 import { field } from "./contracts";
-import { PDFParse } from "pdf-parse";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 
@@ -41,6 +40,14 @@ export function extractCsv(text: string): ExtractedDocument {
 }
 
 export async function extractPdf(bytes: Uint8Array) {
+  // Load inside the request so a PDF dependency failure is caught by the route,
+  // and does not prevent spreadsheets or Word documents from being read.
+  const canvas = await import("@napi-rs/canvas");
+  const globals = globalThis as unknown as Record<string, unknown>;
+  globals.DOMMatrix ??= canvas.DOMMatrix;
+  globals.ImageData ??= canvas.ImageData;
+  globals.Path2D ??= canvas.Path2D;
+  const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({ data: bytes });
   try {
     const result = await parser.getText();

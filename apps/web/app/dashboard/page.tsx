@@ -1,5 +1,6 @@
 import { UploadCard } from "../../components/upload-card";
 import { BookChat } from "../../components/book-chat";
+import { SessionControls } from "../../components/session-controls";
 
 const queue = [
   { name: "INV-2026-1048.pdf", vendor: "Tenaga Supplies Sdn Bhd", meta: "Uploaded 8 min ago · 2 pages", amount: "RM 4,200.00", status: "Needs review", tone: "amber" },
@@ -27,7 +28,7 @@ export default function Home() {
       <div className="accounting-sidebar-foot">Cloud Accounting<br /><small>Last sync a few seconds ago</small></div>
     </aside>
     <div className="accounting-content">
-      <header className="accounting-topbar"><button className="menu-button" aria-label="Open menu">☰</button><strong>Horizon &amp; Co.</strong><div className="top-search">⌕ &nbsp; Search...</div><div className="top-actions">?　♧　▦　⚙　 <span>Aina Raj</span><i>AR</i></div></header>
+      <header className="accounting-topbar"><button className="menu-button" aria-label="Open menu">☰</button><strong>Horizon &amp; Co.</strong><div className="top-search">⌕ &nbsp; Search...</div><div className="top-actions"><SessionControls /></div></header>
       <main className="accounting-main">
         <div className="accounting-heading"><div className="company-placeholder">▧</div><h1>Horizon &amp; Co.</h1></div>
         <section className="autocount-kpis">{kpis.map(([title, value, sub, detail]) => <article className="autocount-card" key={title}><div className="autocount-card-title">{title}<span>⌄</span></div><strong>{value}</strong><small>{sub}</small><p>{detail}</p></article>)}</section>
