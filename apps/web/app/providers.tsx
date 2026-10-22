@@ -14,6 +14,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       navigate={router.push}
       replace={router.replace}
       onSessionChange={() => router.refresh()}
+      social={{ providers: ["google"] }}
       redirectTo="/dashboard"
       Link={Link}
     >
