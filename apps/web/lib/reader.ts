@@ -1,5 +1,6 @@
 import type { ExtractedDocument } from "./contracts";
 import { field } from "./contracts";
+import { PDFParse } from "pdf-parse";
 
 const money = (text: string | null | undefined) => text ? Number(text.replace(/[^\d.-]/g, "")) : null;
 const match = (text: string, pattern: RegExp) => text.match(pattern)?.[1]?.trim() ?? null;
@@ -35,4 +36,14 @@ export function extractCsv(text: string): ExtractedDocument {
   const totalIndex = headers.findIndex((h) => /total|amount|value/.test(h));
   const total = rows.reduce((sum, row) => sum + (totalIndex >= 0 ? Number(row[totalIndex]?.replace(/[^\d.-]/g, "") || 0) : 0), 0);
   return extractText(`bank statement\nTotal: ${total.toFixed(2)}\n${text}`, "statement.csv");
+}
+
+export async function extractPdf(bytes: Uint8Array) {
+  const parser = new PDFParse({ data: bytes });
+  try {
+    const result = await parser.getText();
+    return { text: result.text, pages: typeof result.total === "number" ? result.total : result.pages?.length ?? 1 };
+  } finally {
+    await parser.destroy();
+  }
 }
