@@ -10,10 +10,10 @@ const IFRS = "https://www.ifrs.org/issued-standards/list-of-standards/";
 export function journalDate(raw: string, year = ""): string {
   let y = "", m = "", d = "";
   const iso = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  const local = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  const local = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4}|yyyy)$/i);
   const named = raw.match(/^(\d{1,2})\s+([A-Za-z]+)(?:\s+(\d{4}))?$/);
   if (iso) [, y, m, d] = iso;
-  else if (local) [, d, m, y] = local;
+  else if (local) { [, d, m, y] = local; if (/yyyy/i.test(y)) y = year; }
   else if (named) { d = named[1]; m = String(months.indexOf(named[2].slice(0, 3).toLowerCase()) + 1); y = named[3] || year; }
   if (!/^\d{4}$/.test(y) || +m < 1 || +m > 12 || +d < 1) return "";
   const result = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
@@ -225,10 +225,35 @@ function singleJournal(doc: ExtractedDocument): JournalDraft[] {
   return [j];
 }
 
+function stockAdjustmentJournals(doc: ExtractedDocument): JournalDraft[] {
+  const result: JournalDraft[] = [];
+  const pages = doc.source_pages?.length ? doc.source_pages : [{ page: 1, text: doc.source_text || "" }];
+  for (const page of pages) {
+    const section = page.text.match(/(?:Task\s+[\d.]+\s+)?Stock Adjustment\s*\n([\s\S]*?)(?=Task\s+[\d.]+|$)/i)?.[1];
+    if (!section || !/quantity[\s\S]*unit cost/i.test(section)) continue;
+    const rawDate = section.match(/Date\s*:\s*(\d{1,2}\/\d{1,2}\/(?:\d{4}|yyyy))/i)?.[1] || "";
+    const rows = [...section.matchAll(/^\s*([A-Z0-9]{2,20})\s+(.+?)\s+(-?\d+(?:\.\d+)?)\s+([\d,]+\.\d{2})\s*$/gm)];
+    for (const row of rows) {
+      const quantity = Number(row[3]), unitCost = numericAmount(row[4]), amount = round(Math.abs(quantity * unitCost));
+      if (!quantity || !Number.isFinite(amount) || amount <= 0) continue;
+      const j = blankJournal(`stock-${page.page}-${result.length + 1}`);
+      j.source = "extracted"; j.reference = `STOCK-${row[1]}`; j.rawDate = rawDate; j.date = journalDate(rawDate); j.currency = doc.document.currency.value || "";
+      j.kind = "STOCK_ADJUSTMENT"; j.recommendedModule = "Stock adjustment - confirm inventory system";
+      j.description = `Stock adjustment ${row[1]} ${row[2]}: ${quantity} × ${unitCost.toFixed(2)}`; j.amount = amount;
+      j.lines = [line("", "Inventory - confirm stock valuation account", amount, quantity > 0, j.description), line("", "Inventory adjustment / variance - determine cause", amount, quantity < 0, j.description)];
+      j.evidence = { page: page.page, excerpt: `${section.slice(0, 500)}\nSource row: ${row[0]}\nCalculated value: ${quantity} × ${unitCost.toFixed(2)} = ${(quantity * unitCost).toFixed(2)}` };
+      j.assumptions = ["This is a proposed value effect of an explicit quantity adjustment, not a product selling price. Confirm quantity, valuation basis and cause of the variance.", "Confirm the periodic/perpetual inventory policy. A stock-module adjustment may already generate the GL effect; do not post the same movement twice."];
+      const treatment = treatmentFor(j.kind, "inventory stock adjustment"); j.treatment = treatment.text; j.standards = treatment.standards;
+      result.push(j);
+    }
+  }
+  return result;
+}
+
 export function buildWorksheet(doc: ExtractedDocument): AccountingWorksheet {
   const training = /course book|learning objectives|task\s+\d+\.\d+|chapter\s+\d+/i.test(doc.source_text || "");
   const table = tableJournals(doc);
-  const rows = table.length ? table : structuredJournals(doc);
+  const rows = table.length ? table : [...structuredJournals(doc), ...stockAdjustmentJournals(doc)];
   const journals = rows.length ? rows : training ? [] : singleJournal(doc);
   const notices = ["Account codes must be matched to your company's actual AutoCount chart; suggested names are not synced accounts.", "Journal proposals require review of source evidence, recognition, tax and the financial period. No transaction is posted automatically."];
   if (training) notices.unshift("Training/course material detected. Examples are shown for analysis, not as evidence of actual company transactions. Placeholder years are intentionally left blank.");

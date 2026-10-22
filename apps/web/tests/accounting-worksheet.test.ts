@@ -53,6 +53,14 @@ test("product catalogues and setup prices do not become financial transactions",
   const w = buildWorksheet(extractText("Course Book Chapter 3 Product\nProduct Code 006\nProduct Name POS Basic\nFull Set RM12,000.00\nUnit Cost 1,000.00", "chapter.pdf"));
   assert.equal(w.journals.length, 0);
 });
+test("explicit stock adjustments use quantity times cost, with opposite sides for increases and decreases", () => {
+  const doc = extractText("Course Book\nTask 3.4 Stock Adjustment\nDate: 05/01/yyyy\nStock Code Description Quantity Unit Cost\n001 Example product 1 1,000.00\n002 Other product -1 3,000.00\nTask 3.5 View Stock Reports", "chapter.pdf");
+  const w = buildWorksheet(doc);
+  assert.equal(w.journals.length, 2); assert.equal(w.journals[0].amount, 1000); assert.equal(w.journals[1].amount, 3000);
+  assert.equal(w.journals[0].lines[0].debit, 1000); assert.equal(w.journals[1].lines[0].credit, 3000);
+  assert.equal(w.journals[0].date, ""); assert.equal(journalDate(w.journals[0].rawDate, "2026"), "2026-01-05");
+  assert.equal(w.businessEvidenceConfirmed, false);
+});
 test("quoted CSV narratives and debit/credit columns survive extraction and grouping", () => {
   const doc = extractCsv('Reference,Date,Account Code,Account Name,Description,Debit,Credit\nJV-900002,2026-01-10,910-0000,Stationery,"Paper, pens",125.00,0\nJV-900002,2026-01-10,320-0000,Cash,Payment,0,125.00');
   const w = buildWorksheet(doc);
