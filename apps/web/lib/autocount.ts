@@ -7,10 +7,12 @@ const posted = new Map<string, Posted>();
 export async function postToAutoCount(endpoint: string, payload: ClassifiedTransaction, idempotencyKey: string) {
   const existing = [...posted.values()].find((item) => item.idempotencyKey === idempotencyKey);
   if (existing) return existing;
-  const baseUrl = process.env.AUTCOUNT_API_BASE_URL?.replace(/\/$/, "");
+  const baseUrl = (process.env.AUTCOUNT_API_BASE_URL ?? "https://accounting-api.autocountcloud.com/1").replace(/\/$/, "");
   const apiKey = process.env.AUTCOUNT_API_KEY;
-  if (baseUrl && apiKey) {
-    const response = await fetch(`${baseUrl}/${endpoint}`, { method: "POST", headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "idempotency-key": idempotencyKey }, body: JSON.stringify(payload) });
+  const keyId = process.env.AUTCOUNT_KEY_ID;
+  if (apiKey) {
+    const authHeaders = keyId ? { "API-Key": apiKey, "Key-ID": keyId } : { authorization: `Bearer ${apiKey}` };
+    const response = await fetch(`${baseUrl}/${endpoint}`, { method: "POST", headers: { ...authHeaders, "content-type": "application/json", "idempotency-key": idempotencyKey }, body: JSON.stringify(payload) });
     const body = await response.json().catch(() => null);
     if (!response.ok) throw new Error(body?.message ?? `AutoCount returned HTTP ${response.status}`);
     const docNo = String(body?.documentNo ?? body?.docNo ?? body?.id ?? `ACC-${new Date().getFullYear()}-${String(posted.size + 1).padStart(5, "0")}`);
@@ -23,5 +25,5 @@ export async function postToAutoCount(endpoint: string, payload: ClassifiedTrans
 }
 
 export async function getFromAutoCount(docNo: string) { return posted.get(docNo) ?? null; }
-export function adapterStatus() { return { adapter: process.env.AUTCOUNT_API_BASE_URL && process.env.AUTCOUNT_API_KEY ? "autocount-cloud" : "mock-autocount-cloud", accountBookId: process.env.AUTCOUNT_ACCOUNT_BOOK_ID ?? "demo-book", credentialsConfigured: Boolean(process.env.AUTCOUNT_API_KEY), postedCount: posted.size }; }
+export function adapterStatus() { return { adapter: process.env.AUTCOUNT_API_KEY && process.env.AUTCOUNT_KEY_ID ? "autocount-cloud" : "mock-autocount-cloud", accountBookId: process.env.AUTCOUNT_ACCOUNT_BOOK_ID ?? "demo-book", credentialsConfigured: Boolean(process.env.AUTCOUNT_API_KEY && process.env.AUTCOUNT_KEY_ID), postedCount: posted.size }; }
 export function makeIdempotencyKey(documentId: string, contentHash: string) { return `ACC:${documentId}:${contentHash.slice(0, 16) || randomUUID()}`; }
