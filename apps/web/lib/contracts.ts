@@ -1,4 +1,4 @@
-export type SupportedMime = "application/pdf" | "image/jpeg" | "image/png" | "image/heic" | "text/csv" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" | "application/vnd.ms-excel";
+export type SupportedMime = "application/pdf" | "image/jpeg" | "image/png" | "image/heic" | "text/csv" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" | "application/vnd.ms-excel" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 export type Field<T> = {
   value: T | null;
@@ -49,7 +49,7 @@ export type Finding = { rule_id: string; severity: "error" | "warning" | "info";
 export type ValidationReport = { findings: Finding[]; blocking_count: number; warning_count: number; postable: boolean; checked_at: string; ruleset_version: string; confidence_floor: number };
 export type Posting = { id: string; documentId: string; idempotencyKey: string; endpoint: string; state: "QUEUED" | "POSTING" | "POSTED" | "RECONCILED" | "FAILED" | "MISMATCH"; autocountDocNo?: string; locationUrl?: string; request: unknown; response?: unknown; error?: string; createdAt: string; };
 
-export const SUPPORTED_MIMES: SupportedMime[] = ["application/pdf", "image/jpeg", "image/png", "image/heic", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
+export const SUPPORTED_MIMES: SupportedMime[] = ["application/pdf", "image/jpeg", "image/png", "image/heic", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export function field<T>(value: T | null, raw: string | null, confidence = value === null ? 0 : 0.86, needsHuman = value === null): Field<T> {

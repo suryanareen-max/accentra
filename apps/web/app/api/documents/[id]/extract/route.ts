@@ -1,4 +1,4 @@
-import { extractCsv, extractPdf, extractText } from "../../../../../lib/reader";
+import { extractCsv, extractDocx, extractPdf, extractSpreadsheet, extractText } from "../../../../../lib/reader";
 import { getDocument, readDocumentFile, updateDocument } from "../../../../../lib/document-store";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -8,7 +8,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   try {
     const bytes = await readDocumentFile(id);
     const pdf = record.contentType === "application/pdf" ? await extractPdf(bytes) : null;
-    const text = pdf?.text ?? new TextDecoder().decode(bytes);
+    const spreadsheet = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"].includes(record.contentType) ? extractSpreadsheet(bytes, record.filename) : null;
+    const text = pdf?.text ?? spreadsheet?.text ?? (record.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ? await extractDocx(bytes) : new TextDecoder().decode(bytes));
     const extracted = record.contentType === "text/csv" ? extractCsv(text) : extractText(text, record.filename);
     if (pdf) extracted.quality.pages = pdf.pages;
     const next = await updateDocument(id, { state: "NEEDS_REVIEW", extracted });

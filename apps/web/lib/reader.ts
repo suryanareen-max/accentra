@@ -1,6 +1,8 @@
 import type { ExtractedDocument } from "./contracts";
 import { field } from "./contracts";
 import { PDFParse } from "pdf-parse";
+import * as XLSX from "xlsx";
+import mammoth from "mammoth";
 
 const money = (text: string | null | undefined) => text ? Number(text.replace(/[^\d.-]/g, "")) : null;
 const match = (text: string, pattern: RegExp) => text.match(pattern)?.[1]?.trim() ?? null;
@@ -46,4 +48,15 @@ export async function extractPdf(bytes: Uint8Array) {
   } finally {
     await parser.destroy();
   }
+}
+
+export function extractSpreadsheet(bytes: Uint8Array, filename: string) {
+  const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true });
+  const text = workbook.SheetNames.map((name) => `Sheet: ${name}\n${XLSX.utils.sheet_to_csv(workbook.Sheets[name])}`).join("\n");
+  return { text, filename: filename.toLowerCase().includes("statement") ? "bank-statement.xlsx" : filename };
+}
+
+export async function extractDocx(bytes: Uint8Array) {
+  const result = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
+  return result.value;
 }

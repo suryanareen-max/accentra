@@ -2,14 +2,14 @@
 
 import { useRef, useState } from "react";
 
-const accepted = ".pdf,.jpg,.jpeg,.png,.heic,.xlsx,.xls,.csv";
+const accepted = ".pdf,.jpg,.jpeg,.png,.heic,.xlsx,.xls,.csv,.docx";
 export function UploadCard() {
   const input = useRef<HTMLInputElement>(null); const [status, setStatus] = useState("idle"); const [message, setMessage] = useState(""); const [reviewUrl, setReviewUrl] = useState<string | null>(null);
   async function upload(file: File) {
     setStatus("uploading"); setMessage(`Uploading ${file.name}…`); setReviewUrl(null);
     try {
       const presign = await fetch("/api/documents/presign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ filename: file.name, size: file.size, contentType: file.type || "application/octet-stream" }) });
-      const payload = await presign.json(); if (!presign.ok) throw new Error(payload.error ?? "Could not prepare the upload.");
+      const payload = await presign.json().catch(() => ({ error: `Upload service returned HTTP ${presign.status}. Please refresh and try again.` })); if (!presign.ok) throw new Error(payload.error ?? "Could not prepare the upload.");
       const form = new FormData(); form.set("file", file);
       const uploadResponse = await fetch(payload.uploadUrl, { method: "POST", body: form });
       const uploadResult = await uploadResponse.json().catch(() => null);
