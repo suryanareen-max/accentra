@@ -34,7 +34,7 @@ export function journalIssues(j: JournalDraft): string[] {
   if (!j.date || journalDate(j.date) !== j.date) issues.push(`Confirm the full transaction date${j.rawDate ? ` (source: ${j.rawDate})` : ""}; do not assume the year.`);
   if (!/^[A-Z]{3}$/.test(j.currency)) issues.push("Confirm the transaction currency.");
   if (!Number.isFinite(j.currencyRate) || j.currencyRate <= 0) issues.push("Enter a positive exchange rate.");
-  if (j.currency !== "MYR" && j.currencyRate === 1) issues.push("Verify the foreign-currency exchange rate; 1 is not accepted as a default.");
+  if (j.currency && j.currency !== "MYR" && j.currencyRate === 1) issues.push("Verify the foreign-currency exchange rate; 1 is not accepted as a default.");
   if (!j.description.trim()) issues.push("Add a journal narration.");
   if (j.amount === null || !Number.isFinite(j.amount) || j.amount <= 0) issues.push("Confirm a positive source transaction amount.");
   if (j.lines.length < 2) issues.push("At least two journal lines are required.");
