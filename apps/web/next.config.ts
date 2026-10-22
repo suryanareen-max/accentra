@@ -9,7 +9,6 @@ const nextConfig: NextConfig = {
     "/api/documents/*/extract": [
       "../../node_modules/.pnpm/pdf-parse@*/node_modules/pdf-parse/dist/pdf-parse/**/pdf.worker.mjs",
       "../../node_modules/.pnpm/pdfjs-dist@*/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
-      "../../node_modules/.pnpm/@napi-rs+canvas*/node_modules/@napi-rs/**/*",
     ],
   },
   async headers() {
