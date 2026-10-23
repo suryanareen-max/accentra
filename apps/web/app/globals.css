@@ -236,6 +236,7 @@ h1 { font-size: 32px; letter-spacing: -0.045em; margin: 0; }
 .compact-chat { padding: 14px; }
 .compact-chat .saved-chat-actions { margin-bottom: 12px; }
 .compact-chat .saved-chat-layout { display: block; }
+.compact-chat .chat-workspace { min-height: 0; }
 .compact-chat .conversation-history { width: 100%; max-height: 200px; margin-bottom: 12px; }
 .compact-chat .chat-thread { min-height: 120px; max-height: 350px; padding: 16px; }
 .compact-chat .attachment-preview img, .compact-chat .attachment-preview iframe { max-height: 220px; }
