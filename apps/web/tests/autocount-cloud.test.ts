@@ -39,3 +39,26 @@ test("AutoCount uses the configured destination book and mandatory headers, with
     names.forEach((n, i) => { if (originalEnv[i] === undefined) delete process.env[n]; else process.env[n] = originalEnv[i]; });
   }
 });
+
+test("the documented AUTCOUNT_API_URL alias targets the configured account book", async () => {
+  const originalFetch = global.fetch;
+  const names = ["AUTCOUNT_API_KEY", "AUTCOUNT_KEY_ID", "AUTCOUNT_ACCOUNT_BOOK_ID", "AUTCOUNT_API_BASE_URL", "AUTCOUNT_API_URL"];
+  const originalEnv = names.map((n) => process.env[n]);
+  process.env.AUTCOUNT_API_KEY = "unit-test-secret";
+  process.env.AUTCOUNT_KEY_ID = "unit-test-key-id";
+  process.env.AUTCOUNT_ACCOUNT_BOOK_ID = "74400";
+  delete process.env.AUTCOUNT_API_BASE_URL;
+  process.env.AUTCOUNT_API_URL = "https://accounting-api.autocountcloud.com/1";
+  let requestedUrl = "";
+  global.fetch = (async (url: string | URL | Request) => {
+    requestedUrl = String(url);
+    return Response.json({ data: [], totalCount: 0 });
+  }) as typeof fetch;
+  try {
+    await fetchCloudAccounts();
+    assert.ok(requestedUrl.startsWith("https://accounting-api.autocountcloud.com/74400/"));
+  } finally {
+    global.fetch = originalFetch;
+    names.forEach((n, i) => { if (originalEnv[i] === undefined) delete process.env[n]; else process.env[n] = originalEnv[i]; });
+  }
+});

@@ -11,7 +11,10 @@ export function cloudStatus() {
 function connection() {
   const status = cloudStatus();
   if (!status.configured) throw new Error(`AutoCount is not connected. Add ${status.missing.join(", ")} in Vercel. No accounting entry has been sent.`);
-  const root = (process.env.AUTCOUNT_API_BASE_URL || "https://accounting-api.autocountcloud.com").replace(/\/$/, "").replace(/\/\d+$/, "");
+  // Keep compatibility with the earlier documented AUTCOUNT_API_URL name.
+  // Both values may contain an account-book path; the configured book ID is
+  // always appended below so the request cannot silently target another book.
+  const root = (process.env.AUTCOUNT_API_BASE_URL || process.env.AUTCOUNT_API_URL || "https://accounting-api.autocountcloud.com").trim().replace(/\/$/, "").replace(/\/\d+$/, "");
   return { base: `${root}/${encodeURIComponent(status.accountBookId)}`, headers: { "API-Key": process.env.AUTCOUNT_API_KEY!, "Key-ID": process.env.AUTCOUNT_KEY_ID!, "content-type": "application/json" } };
 }
 
