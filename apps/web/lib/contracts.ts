@@ -23,6 +23,7 @@ export type ExtractedDocument = {
 };
 
 export type DocumentRecord = {
+  trashed?: boolean;
   id: string;
   filename: string;
   contentType: SupportedMime;

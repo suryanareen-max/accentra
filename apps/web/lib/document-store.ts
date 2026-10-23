@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import type { DocumentRecord, SupportedMime } from "./contracts";
 import { accountBooks, documents, tenants } from "./db/schema";
 import { getDb } from "./db";
@@ -32,6 +32,7 @@ function toRecord(row: typeof documents.$inferSelect): DocumentRecord {
     state: row.status as DocumentRecord["state"],
     createdAt: row.createdAt.toISOString(),
     ...metadata,
+    trashed: row.source === "TRASH",
   };
 }
 
@@ -59,8 +60,8 @@ export async function createDocument(input: Omit<DocumentRecord, "state" | "crea
   return toRecord(row);
 }
 
-export async function getDocument(id: string) {
-  const [row] = await getDb().select().from(documents).where(eq(documents.id, id)).limit(1);
+export async function getDocument(id: string, includeTrash = false) {
+  const [row] = await getDb().select().from(documents).where(and(eq(documents.id, id), includeTrash ? undefined : ne(documents.source, "TRASH"))).limit(1);
   return row ? toRecord(row) : undefined;
 }
 
@@ -92,9 +93,16 @@ export async function saveDocumentFile(id: string, bytes: Uint8Array, contentTyp
 export async function readDocumentFile(id: string) { return readStoredDocumentFile(id); }
 export function contentHash(bytes: Uint8Array) { return createHash("sha256").update(bytes).digest("hex"); }
 
-export async function listDocuments() {
-  const rows = await getDb().select().from(documents).orderBy(desc(documents.createdAt));
+export async function listDocuments(includeTrash = false) {
+  const rows = await getDb().select().from(documents).where(includeTrash ? undefined : ne(documents.source, "TRASH")).orderBy(desc(documents.createdAt));
   return rows.map(toRecord);
+}
+
+// Keep source files, review history and ledger references. Only hide the workpaper.
+// A separate column flag cannot be overwritten by a concurrent extraction metadata update.
+export async function setDocumentTrashed(id: string, trashed: boolean) {
+  const [row] = await getDb().update(documents).set({ source: trashed ? "TRASH" : "UPLOAD" }).where(eq(documents.id, id)).returning();
+  return row ? toRecord(row) : undefined;
 }
 
 export async function listAccountBooks() {

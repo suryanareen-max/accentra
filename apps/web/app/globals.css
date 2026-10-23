@@ -175,3 +175,23 @@ h1 { font-size: 32px; letter-spacing: -0.045em; margin: 0; }
 .analysis-sources a { color: #176d53; overflow-wrap: anywhere; }
 .analysis-warning { padding: 12px; border-radius: 6px; background: #fff3df; color: #71470d; font-size: 13px; }
 .analysis-attachment { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 16px; background: #eaf4ee; }
+
+.document-list { min-width: 0; }
+.document-list-toolbar, .document-pagination, .document-pagination > div { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.document-list-toolbar { padding: 8px 0 16px; border-bottom: 1px solid #dfe7e1; }
+.document-list-toolbar label { font-size: 12px; display: flex; gap: 8px; align-items: center; }
+.document-list-toolbar select { width: auto; padding: 5px 8px; }
+.list-tab, .list-page { background: transparent; border: 1px solid #dfe7e1; border-radius: 5px; padding: 8px 12px; color: #234b3e; cursor: pointer; }
+.list-tab.selected, .list-page.selected { background: #e5f3eb; border-color: #257551; font-weight: 700; }
+.list-tab + .list-tab { margin-left: 6px; }
+.document-list-row { border-bottom: 1px solid #dfe7e1; }
+.document-list-row .queue-row { display: flex; border-bottom: 0; gap: 12px; }
+.document-list-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.document-journal-link { white-space: nowrap; font-size: 12px; }
+.document-delete { flex-shrink: 0; display: grid; place-items: center; background: transparent; border: 1px solid #ecd9d5; border-radius: 6px; width: 36px; height: 36px; color: #ac4536; cursor: pointer; }
+.document-delete:hover { background: #fff0ed; }
+.document-delete:disabled { opacity: .5; }
+.document-delete-confirm, .document-undo { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px; margin-bottom: 12px; background: #fff6e7; border-radius: 6px; font-size: 13px; }
+.document-pagination { padding: 20px 0 8px; font-size: 12px; }
+.document-pagination .button { padding: 7px 10px; }
+@media (max-width: 650px) { .document-list-row .queue-row { flex-wrap: wrap; } .document-list-name { flex-basis: 75%; } .document-pagination > div { gap: 5px; } }

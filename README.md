@@ -85,3 +85,9 @@ On a document review, use **Analyse with DeepSeek**. The analyst receives extrac
 The default standards search calls DeepSeek's `/v1/tools/search` with generic accounting topics only. Retrieved references are restricted to IFRS, MASB and MIA HTTPS domains and shown beside the answer. Search outages are disclosed; guidance is advisory and does not imply access to the full standards corpus. Disable the search checkbox to analyse document evidence without a web lookup. Source text and the conversation are sent to DeepSeek; private names and document text are never sent as public search queries.
 
 The analyst is read-only: it cannot save, confirm, approve or send entries. Use the accountant workpaper to review and save changes; existing validation and approval requirements still control AutoCount posting. Provider authentication, balance, timeout and rate-limit failures are reported explicitly.
+
+### Workpaper list and chat recovery
+
+The dashboard list has numbered pages and 10/20/50 documents per page. The delete icon moves a document to Trash, with Undo and a persistent Trash/Restore view. This does not remove source storage, review history or AutoCount postings. Trashed documents are excluded from active document APIs, source analysis, workpapers and validation until restored.
+
+Read-only chat requests retry one interrupted network connection. Questions and selected documents remain available after a failed request. Session expiry returns a sign-in action rather than a raw fetch error. Greetings use a short DeepSeek call without querying the full document register or public standards search.

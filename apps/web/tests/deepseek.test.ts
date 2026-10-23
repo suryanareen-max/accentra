@@ -58,3 +58,17 @@ test("standards searches do not include private questions and source URLs are re
   assert.ok(officialSource("https://www.masb.org.my/standard"));
   assert.ok(!officialSource("http://ifrs.org/")); assert.ok(!officialSource("https://ifrs.org@evil.test/")); assert.ok(!officialSource("https://evil.ifrs.org.evil.test/"));
 });
+
+test("greetings use DeepSeek without reading document records or searching standards", async () => {
+  const originalFetch = global.fetch; const previous = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = "test-server-secret";
+  try {
+    global.fetch = (async (url, options) => {
+      assert.equal(String(url), "https://api.deepseek.com/chat/completions");
+      const body = JSON.parse(String(options?.body)); assert.equal(body.max_tokens, 256);
+      const context = JSON.parse(body.messages.at(-1).content); assert.equal(context.context.documentCount, undefined); assert.equal(context.searchStatus, "disabled");
+      return Response.json({ choices: [{ finish_reason: "stop", message: { content: "Hello! How can I help?" } }] });
+    }) as typeof fetch;
+    assert.equal((await analyseWithDeepSeek({ message: "hi", search: true })).answer, "Hello! How can I help?");
+  } finally { global.fetch = originalFetch; if (previous === undefined) delete process.env.DEEPSEEK_API_KEY; else process.env.DEEPSEEK_API_KEY = previous; }
+});

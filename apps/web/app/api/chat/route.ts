@@ -1,5 +1,5 @@
 import { getDocument, listDocuments } from "../../../lib/document-store";
-import { analyseWithDeepSeek, DeepSeekError, type ConversationTurn } from "../../../lib/deepseek";
+import { analyseWithDeepSeek, DeepSeekError, isGreeting, type ConversationTurn } from "../../../lib/deepseek";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export async function POST(request: Request) {
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     if (mode === "document" && !document) return Response.json({ error: "Document not found. Upload or select a document first." }, { status: 404 });
     if (document && !document.extracted?.source_text?.trim()) return Response.json({ error: "This file has no readable extracted text. Re-read it, or upload a text-based PDF, Excel, CSV or Word (.docx) file. Scanned pages need OCR before analysis." }, { status: 422 });
     const history: ConversationTurn[] = Array.isArray(body.history) ? body.history.slice(-8).filter((turn: ConversationTurn) => (turn?.role === "user" || turn?.role === "assistant") && typeof turn.content === "string").map((turn: ConversationTurn) => ({ role: turn.role, content: turn.content.slice(0, 6000) })) : [];
-    const result = await analyseWithDeepSeek({ message: body.message.trim(), document, documents: mode === "books" ? await listDocuments() : [], history, search: body.search !== false });
+    const result = await analyseWithDeepSeek({ message: body.message.trim(), document, documents: mode === "books" && !isGreeting(body.message) ? await listDocuments() : [], history, search: body.search !== false });
     return Response.json({ ...result, mode, documentId: document?.id }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof DeepSeekError) return Response.json({ error: error.message, code: error.code }, { status: error.status });
