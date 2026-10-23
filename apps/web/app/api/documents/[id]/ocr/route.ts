@@ -1,7 +1,7 @@
 import { getDocument, readDocumentFile, updateDocument } from "../../../../../lib/document-store";
 import { listJournalPostings } from "../../../../../lib/journal-postings";
 import { extractText, renderPdfPages } from "../../../../../lib/reader";
-import { transcribePages } from "../../../../../lib/ocr";
+import { markOcrFieldsForReview, transcribePages } from "../../../../../lib/ocr";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -29,6 +29,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const pages = [...(latest.extracted.source_pages ?? [{ page: 1, text: "" }])].map((page) => recognized.find((item) => item.page === page.page) ?? page).sort((a,b) => a.page-b.page);
     const sourceText = pages.map((page) => page.text).join("\n\n");
     const extracted = extractText(sourceText, doc.filename);
+    markOcrFieldsForReview(extracted);
     extracted.source_pages = pages; extracted.quality.pages = latest.extracted.quality.pages; extracted.quality.is_scanned = true;
     const processedPages = [...new Set([...(latest.extracted.ocr?.processedPages ?? []), ...recognized.map((page) => page.page)])];
     const pendingPages = (latest.extracted.ocr?.pendingPages ?? []).filter((page) => !processedPages.includes(page));

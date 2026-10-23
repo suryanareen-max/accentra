@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { needsOcr, transcribePages, validateOcrPages } from "../lib/ocr";
+import { needsOcr, transcribePages, validateOcrPages, markOcrFieldsForReview } from "../lib/ocr";
 test("OCR detects empty or sparse scanned pages while preserving text-rich pages",()=>{
   assert.equal(needsOcr("\n-- 1 of 4 --\n"),true); assert.equal(needsOcr("Scanned invoice"),true);
   assert.equal(needsOcr("Invoice INV-123 Date 2026-10-23 Supplier Example Company Total MYR 125.50"),false);
@@ -26,4 +26,9 @@ test("OCR sends images only to DeepSeek with transcription guardrails and reject
     global.fetch=(async()=>Response.json({}, {status:402})) as typeof fetch;
     await assert.rejects(transcribePages([{page:1,data:new Uint8Array()}]),/insufficient credit/);
   } finally {global.fetch=before;if(key===undefined)delete process.env.DEEPSEEK_API_KEY;else process.env.DEEPSEEK_API_KEY=key;}
+});
+
+test("OCR-derived fields remain review-required without changing recognised values",()=>{
+  const fields={document:{date:{value:"2026-10-23",confidence:.88,needs_human:false}},totals:{total:{value:125.50,confidence:.9,needs_human:false}}};
+  markOcrFieldsForReview(fields); assert.equal(fields.document.date.value,"2026-10-23");assert.equal(fields.totals.total.value,125.5);assert.equal(fields.totals.total.confidence,.7);assert.equal(fields.document.date.needs_human,true);
 });

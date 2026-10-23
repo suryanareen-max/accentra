@@ -1,5 +1,14 @@
 export function needsOcr(text: string) { return (text.replace(/--\s*\d+\s+of\s+\d+\s*--/g, "").match(/[\p{L}\p{N}]/gu) ?? []).length < 40; }
 export type OcrPage = { page: number; text: string };
+export function markOcrFieldsForReview(value: unknown): void {
+  if (!value || typeof value !== "object") return;
+  const item = value as Record<string, unknown>;
+  if ("value" in item && typeof item.confidence === "number" && "needs_human" in item) {
+    item.confidence = Math.min(item.confidence, .7);
+    item.needs_human = true;
+  }
+  for (const child of Object.values(item)) markOcrFieldsForReview(child);
+}
 export function validateOcrPages(value: unknown, requested: number[]): OcrPage[] {
   if (!Array.isArray(value)) throw new Error("OCR returned no page transcription. Retry the page.");
   return requested.map((page) => {
