@@ -98,4 +98,18 @@ export const auditEvents = pgTable("audit_events", {
   createdAt: createdAt(),
 }, (table) => [index("audit_events_tenant_id_idx").on(table.tenantId), index("audit_events_entity_idx").on(table.entity, table.entityId)]);
 
-export const schema = { tenants, users, accountBooks, documents, reviews, postings, auditEvents };
+export const chatConversations = pgTable("chat_conversations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerId: text("owner_id").notNull(),
+  title: text("title").notNull().default("New chat"),
+  documentId: uuid("document_id").references(() => documents.id, { onDelete: "set null" }),
+  annotation: text("annotation").notNull().default(""),
+  search: boolean("search").notNull().default(true),
+  messages: jsonb("messages").notNull().default([]),
+  pendingRequestId: uuid("pending_request_id"),
+  pendingSince: timestamp("pending_since", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("chat_conversations_owner_updated_idx").on(table.ownerId, table.updatedAt)]);
+
+export const schema = { tenants, users, accountBooks, documents, reviews, postings, auditEvents, chatConversations };

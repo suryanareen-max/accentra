@@ -1,41 +1,117 @@
 "use client";
-import { useRef, useState } from "react";
-import type { AnalysisResult } from "../lib/deepseek";
+import { useEffect, useRef, useState } from "react";
+import type { DocumentRecord } from "../lib/contracts";
+import type { ConversationSummary, SavedConversation } from "../lib/chat-contracts";
 import { AnalysisAnswer } from "./analysis-answer";
 import { requestChat, ChatRequestError } from "../lib/chat-request";
 import { readUploadResponse } from "../lib/upload-response";
-type Message = { role: "assistant" | "user" | "system"; text: string; result?: AnalysisResult };
-type Attachment = { id: string; filename: string };
-export function ChatWorkspace() {
-  const input = useRef<HTMLInputElement>(null);
-  const [messages, setMessages] = useState<Message[]>([{ role: "assistant", text: "I’m your DeepSeek accounting analyst. Attach a financial document or ask about the available book records. I can analyse source evidence, journal entries and IFRS/MFRS treatment." }]);
-  const [question, setQuestion] = useState(""); const [busy, setBusy] = useState(false); const [uploading, setUploading] = useState(false);
-  const [connection, setConnection] = useState(""); const [signInRequired, setSignInRequired] = useState(false);
-  const [attachment, setAttachment] = useState<Attachment | null>(null); const [search, setSearch] = useState(true);
-  async function ask(value = question.trim(), selected = attachment, fresh = false) {
-    if (!value || busy) return;
-    setMessages((current) => [...current, { role: "user", text: value }]); setQuestion(""); setBusy(true); setConnection(""); setSignInRequired(false);
+import { prepareDocument } from "../lib/prepare-document";
+async function jsonRequest(url: string, options?: RequestInit) { return readUploadResponse(await fetch(url, { cache: "no-store", ...options }), "Conversation"); }
+export function ChatWorkspace({ compact = false }: { compact?: boolean }) {
+  const input = useRef<HTMLInputElement>(null); const mounted = useRef(true);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]); const [conversation, setConversation] = useState<SavedConversation | null>(null);
+  const [document, setDocument] = useState<DocumentRecord | null>(null); const [annotation, setAnnotation] = useState(""); const [search, setSearch] = useState(true);
+  const [question, setQuestion] = useState(""); const [busy, setBusy] = useState(false); const [progress, setProgress] = useState(""); const [error, setError] = useState(""); const [signInRequired, setSignInRequired] = useState(false);
+  const [loading, setLoading] = useState(true); const [showHistory, setShowHistory] = useState(!compact); const [historyFilter, setHistoryFilter] = useState(""); const [optimistic, setOptimistic] = useState("");
+  const pending = Boolean(conversation?.pendingRequestId && conversation.pendingSince && Date.now() - new Date(conversation.pendingSince).getTime() < 120000);
+  const disabled = busy || loading || pending;
+  const notesDirty = Boolean(conversation && (annotation !== conversation.annotation || search !== conversation.search));
+  function remember(value: SavedConversation) {
+    setConversation(value);
+    setConversations((current) => [{ id:value.id,title:value.title,documentId:value.documentId,updatedAt:value.updatedAt },...current.filter((item) => item.id !== value.id)].slice(0,100));
+  }
+  async function refreshHistory() { const result = await jsonRequest("/api/conversations"); setConversations(result.conversations); return result.conversations as ConversationSummary[]; }
+  async function loadConversation(id: string, replaceInputs = true) {
+    const result = await jsonRequest(`/api/conversations/${id}`); const saved = result.conversation as SavedConversation;
+    if (!mounted.current) return saved;
+    remember(saved);
+    if (replaceInputs) {
+      setAnnotation(saved.annotation); setSearch(saved.search); setQuestion(""); setOptimistic("");
+      if (saved.documentId) {
+        try { const payload = await jsonRequest(`/api/documents/${saved.documentId}`); setDocument(payload.document); }
+        catch { setDocument(null); setError("This chat's document is in Trash or unavailable. Restore it or detach it to continue."); }
+      } else setDocument(null);
+    }
+    return saved;
+  }
+  useEffect(() => {
+    mounted.current = true;
+    void (async () => {
+      try {
+        const items = await refreshHistory();
+        const selected = !compact ? new URLSearchParams(window.location.search).get("conversation") : null;
+        if (selected || items[0]) await loadConversation(selected || items[0].id);
+      } catch (error) { if (mounted.current) setError(error instanceof Error ? error.message : "Could not load chat history."); }
+      finally { if (mounted.current) setLoading(false); }
+    })();
+    return () => { mounted.current = false; };
+  }, []); // Each mounted workspace loads its signed-in user's history once.
+  useEffect(() => {
+    if (!conversation?.pendingRequestId || !pending) return;
+    const timer = setInterval(() => { void loadConversation(conversation.id, false).catch(() => undefined); }, 3000);
+    return () => clearInterval(timer);
+  }, [conversation?.id, conversation?.pendingRequestId, pending]);
+  useEffect(() => {
+    if (!compact && conversation?.id) {
+      const url = new URL(window.location.href); url.searchParams.set("conversation",conversation.id); window.history.replaceState(null,"",url);
+    }
+  }, [compact,conversation?.id]);
+  async function ensureConversation() {
+    if (conversation) return conversation;
+    const result = await jsonRequest("/api/conversations", { method: "POST" }); const saved = result.conversation as SavedConversation; remember(saved); return saved;
+  }
+  async function saveContext(value?: SavedConversation, documentId?: string | null) {
+    const current = value || await ensureConversation();
+    const result = await jsonRequest(`/api/conversations/${current.id}`, { method: "PATCH", headers: { "content-type":"application/json" }, body: JSON.stringify({ annotation, search, documentId: documentId === undefined ? current.documentId : documentId }) });
+    remember(result.conversation); return result.conversation as SavedConversation;
+  }
+  function showError(error: unknown) { setError(error instanceof Error ? error.message : "The request failed. Please retry."); setSignInRequired(error instanceof ChatRequestError && error.signInRequired); }
+  async function chooseConversation(id?: string) {
+    if (disabled) return; setBusy(true); setError("");
     try {
-      const history = fresh ? [] : messages.filter((message) => message.role !== "system").slice(-8).map((message) => ({ role: message.role, content: message.text }));
-      const result = await requestChat({ message: value, mode: selected ? "document" : "books", documentId: selected?.id, history: history as import("../lib/deepseek").ConversationTurn[], search }, () => setConnection("Connection interrupted. Reconnecting once…"));
-      setMessages((current) => [...current, { role: "assistant", text: result.answer, result }]);
-    } catch (error) { setQuestion(value); setSignInRequired(error instanceof ChatRequestError && error.signInRequired); setMessages((current) => [...current, { role: "system", text: error instanceof Error ? error.message : "Analysis failed. Please retry." }]); }
-    finally { setBusy(false); setConnection(""); }
+      if (notesDirty) await saveContext();
+      if (id) await loadConversation(id);
+      else { const result = await jsonRequest("/api/conversations", { method:"POST" }); remember(result.conversation); setDocument(null); setAnnotation(""); setQuestion(""); setSearch(true); setOptimistic(""); }
+      if (compact) setShowHistory(false);
+    } catch (error) { showError(error); } finally { setBusy(false); }
   }
   async function upload(file: File) {
-    setUploading(true); setMessages((current) => [...current, { role: "system", text: `Uploading ${file.name} and preparing its source text…` }]);
+    if (disabled) return; setBusy(true); setError(""); setProgress(`Uploading ${file.name}…`);
     try {
-      const presign = await fetch("/api/documents/presign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ filename: file.name, size: file.size, contentType: file.type || "application/octet-stream" }) });
-      const payload = await readUploadResponse(presign, "Preparing upload");
-      const form = new FormData(); form.set("file", file);
-      await readUploadResponse(await fetch(payload.uploadUrl, { method: "POST", body: form }), "Saving document");
-      await readUploadResponse(await fetch(payload.extractUrl, { method: "POST" }), "Reading document");
-      await readUploadResponse(await fetch(`/api/documents/${payload.document.id}/classify`, { method: "POST" }), "Classifying document");
-      const selected = { id: payload.document.id, filename: file.name };
-      setAttachment(selected); setMessages([{ role: "system", text: `${file.name} is attached. DeepSeek is analysing its extracted text. Follow-up questions will use this document.` }]);
-      await ask("Analyse the attached document: identify transactions and amounts, propose debit/credit entries, evaluate IFRS/MFRS treatment and flag missing evidence for AutoCount.", selected, true);
-    } catch (error) { setMessages((current) => [...current, { role: "system", text: error instanceof Error ? error.message : "Upload failed. Please retry." }]); }
-    finally { setUploading(false); }
+      const current = await ensureConversation();
+      const presign = await readUploadResponse(await fetch("/api/documents/presign", { method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({filename:file.name,size:file.size,contentType:file.type||"application/octet-stream"}) }),"Preparing upload");
+      const form = new FormData(); form.set("file",file);
+      const result = await readUploadResponse(await fetch(presign.uploadUrl,{method:"POST",body:form}),"Saving document");
+      await saveContext(current,presign.document.id); setDocument(result.document || presign.document);
+      setProgress("File attached. Preview it and add notes below. Reading/OCR and AI analysis start only when you choose them.");
+    } catch (error) { showError(error); } finally { setBusy(false); }
   }
-  return <div className="chat-workspace card">{attachment && <div className="analysis-attachment"><span>Attached: <a href={`/review/${attachment.id}`}>{attachment.filename} · Open workpaper</a></span><button type="button" className="button secondary" disabled={busy || uploading} onClick={() => { setAttachment(null); setMessages([{ role: "system", text: "Document detached. Questions now use the book mirror summary." }]); }}>Detach</button></div>}<div className="chat-thread">{messages.map((message, index) => <div className={`chat-message ${message.role}`} key={`${message.role}-${index}`}><div className="chat-role">{message.role === "assistant" ? "DeepSeek · Accentra" : message.role === "user" ? "You" : "System"}</div><div className="chat-bubble">{message.result ? <AnalysisAnswer result={message.result} /> : message.text}</div></div>)}</div>{connection && <p role="status" className="doc-meta">{connection}</p>}{signInRequired && <p className="analysis-warning"><a href="/login" target="_blank" rel="noopener noreferrer">Sign in in a new tab</a>, then return here and resend your saved question.</p>}<label className="analysis-search"><input type="checkbox" checked={search} onChange={(event) => setSearch(event.target.checked)} disabled={busy || uploading} /> Search official IFRS/MFRS references</label><div className="chat-composer"><button className="attach-button" onClick={() => input.current?.click()} disabled={uploading || busy} title="Upload a document">＋</button><input ref={input} hidden type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.xlsx,.xls,.csv,.docx" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void upload(file); }} /><input className="question-input" value={question} disabled={busy || uploading} maxLength={4000} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !uploading) void ask(); }} placeholder={attachment ? "Ask about the attached document…" : "Ask about your books or attach a document…"} /><button className="button" onClick={() => void ask()} disabled={busy || uploading || !question.trim()}>{busy ? "Analysing…" : uploading ? "Reading…" : "Send"}</button></div><div className="chat-disclaimer">Selected source text is sent to DeepSeek. AI suggestions require review and never post from chat. Scanned pages need OCR.</div></div>;
+  async function readSource() {
+    if (disabled || !conversation?.documentId) return; setBusy(true); setError("");
+    try { await saveContext(); setDocument(await prepareDocument(conversation.documentId,setProgress)); setProgress("Reading/OCR complete. Check the extracted text, add any notes, then choose Analyse document."); }
+    catch (error) { showError(error); } finally { setBusy(false); }
+  }
+  async function ask(value = question.trim()) {
+    if (!value || disabled) return; setBusy(true); setError(""); setSignInRequired(false); setProgress(""); let saved: SavedConversation | undefined;
+    const requestId = crypto.randomUUID();
+    try {
+      saved = await saveContext();
+      if (saved.documentId && (!document?.extracted || !document.worksheet || document.extracted.ocr?.pendingPages.length || (!document.extracted.source_text?.trim() && !document.extracted.ocr))) setDocument(await prepareDocument(saved.documentId,setProgress));
+      setQuestion(""); setOptimistic(value); setProgress("DeepSeek is analysing…");
+      await requestChat({ message:value,mode:saved.documentId?"document":"books",conversationId:saved.id,requestId,search },()=>setProgress("Connection interrupted. Reconnecting once…"));
+      await loadConversation(saved.id,false); setOptimistic(""); setProgress("");
+    } catch (error) {
+      setQuestion(value); setOptimistic(""); showError(error); setProgress("");
+      if (saved) {
+        try { const latest = await loadConversation(saved.id,false); if (latest.messages.some((message)=>message.role==="assistant"&&message.requestId===requestId)) { setError(""); setQuestion(""); } } catch { /* Keep the original actionable error and typed question. */ }
+      }
+    } finally { setBusy(false); }
+  }
+  async function detach() {
+    if (disabled) return; setBusy(true); setError("");
+    try { await saveContext(undefined,null); setDocument(null); setProgress("Document detached. Saved messages remain in this conversation."); } catch (error) { showError(error); } finally { setBusy(false); }
+  }
+  async function saveNotes() { if (disabled) return; setBusy(true); setError(""); try { await saveContext(); setProgress("Notes saved to this conversation."); } catch (error) { showError(error); } finally { setBusy(false); } }
+  const messages = conversation?.messages ?? [];
+  return <div className={`saved-chat ${compact?"compact-chat":""}`}><div className="saved-chat-actions"><button className="button" disabled={disabled} onClick={()=>void chooseConversation()}>＋ New chat</button><button className="button secondary" aria-expanded={showHistory} onClick={()=>setShowHistory(!showHistory)}>History</button><span className="doc-meta">{conversation ? "Saved in your account" : "Start a conversation"}</span></div><div className="saved-chat-layout">{showHistory && <aside className="conversation-history" aria-label="Past conversations"><h2>Past conversations</h2><input aria-label="Search conversations" placeholder="Search conversations…" value={historyFilter} onChange={(event)=>setHistoryFilter(event.target.value)} /><div className="conversation-links">{conversations.filter((item)=>item.title.toLowerCase().includes(historyFilter.toLowerCase())).map((item)=><button key={item.id} className={conversation?.id===item.id?"active":""} disabled={disabled} onClick={()=>void chooseConversation(item.id)}><strong>{item.title}</strong><small>{new Date(item.updatedAt).toLocaleString("en-MY",{timeZone:"Asia/Kuala_Lumpur"})}</small></button>)}{!conversations.length&&<p className="doc-meta">Your conversations will appear here.</p>}</div></aside>}<div className="chat-workspace card">{conversation?.documentId && <div className="annotation-panel"><div className="analysis-attachment"><strong>{document?.filename||"Attached document"}</strong><div><a href={`/review/${conversation.documentId}`} target="_blank" rel="noopener noreferrer">Workpaper ↗</a> <button className="button secondary" disabled={disabled} onClick={()=>void detach()}>Detach</button></div></div><details className="attachment-preview"><summary>Preview original file</summary>{document?.contentType.startsWith("image/") ? <img src={`/api/documents/${conversation.documentId}/file`} alt={`Original uploaded file: ${document.filename}`} /> : document?.contentType==="application/pdf" ? <iframe title="Original uploaded PDF" src={`/api/documents/${conversation.documentId}/file`} /> : <p>Office documents can be opened in their original application.</p>}<a href={`/api/documents/${conversation.documentId}/file`} target="_blank" rel="noopener noreferrer">Open original in a new tab ↗</a></details><label className="annotation-label">Notes / annotations before analysis<textarea aria-label="Document annotations" value={annotation} maxLength={6000} rows={3} disabled={disabled} onChange={(event)=>setAnnotation(event.target.value)} placeholder="For example: Page 2 relates to January; exclude the void invoice; check the negative quantity. Notes are kept separate from source evidence." /></label><div className="annotation-actions"><button className="button secondary" disabled={disabled} onClick={()=>void saveNotes()}>Save notes</button><button className="button secondary" disabled={disabled} onClick={()=>void readSource()}>Read / OCR</button><button className="button" disabled={disabled} onClick={()=>void ask("Analyse the attached document using my annotations. Identify dates, amounts and balanced debit/credit proposals; explain IFRS/MFRS treatment and what must be checked before AutoCount posting.")}>Analyse document</button><span className="doc-meta">{notesDirty?"Unsaved notes/settings":document?.extracted?.ocr?`OCR ${document.extracted.ocr.status} · ${document.extracted.ocr.processedPages.length} page(s) read`:document?.extracted?"Text extracted":"Not analysed yet"}</span></div>{document?.extracted?.source_text&&<details className="recognized-text"><summary>Check extracted / OCR text</summary><pre>{document.extracted.source_text}</pre></details>}{document?.extracted?.ocr?.warnings.map((warning)=><p key={warning} className="doc-meta ocr-notice">{warning}</p>)}</div>}<div className="chat-thread" aria-live="polite">{!messages.length && !optimistic && <div className="chat-message assistant"><div className="chat-role">DeepSeek · Accentra</div><div className="chat-bubble">{loading?"Loading your saved conversations…":"Attach a document, add your annotations, then choose Analyse document. Or ask a question about your books. Conversations are saved in your account."}</div></div>}{messages.map((message)=><div className={`chat-message ${message.role}`} key={message.id}><div className="chat-role">{message.role==="user"?"You":message.role==="assistant"?"DeepSeek · Accentra":"System"}</div><div className="chat-bubble">{message.result?<AnalysisAnswer result={message.result}/>:message.text}{message.role==="user"&&message.annotation&&<details><summary>Notes used for this question</summary><p>{message.annotation}</p></details>}</div></div>)}{optimistic&&!messages.some((message)=>message.role==="user"&&message.text===optimistic)&&<div className="chat-message user"><div className="chat-role">You</div><div className="chat-bubble">{optimistic}</div></div>}</div>{(progress||pending)&&<p className="chat-progress" role="status">{progress||"A response is being prepared. This conversation refreshes automatically."}</p>}{error&&<div role="alert" className="analysis-warning">{error} {signInRequired&&<a href="/login" target="_blank" rel="noopener noreferrer">Sign in, then return to this chat</a>}</div>}<label className="analysis-search"><input type="checkbox" checked={search} disabled={disabled} onChange={(event)=>setSearch(event.target.checked)}/> Search official IFRS/MFRS references</label><div className="chat-composer"><button className="attach-button" disabled={disabled} title="Upload a document" aria-label="Attach a document" onClick={()=>input.current?.click()}>＋</button><input hidden type="file" ref={input} accept=".pdf,.jpg,.jpeg,.png,.heic,.xlsx,.xls,.csv,.docx" onChange={(event)=>{const file=event.target.files?.[0];event.target.value="";if(file)void upload(file);}}/><textarea aria-label="Chat question" className="question-input" rows={2} maxLength={4000} value={question} disabled={disabled} onChange={(event)=>setQuestion(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();void ask();}}} placeholder={conversation?.documentId?"Ask about the attached document…":"Ask about your books or attach a document…"}/><button className="button" disabled={disabled||!question.trim()} onClick={()=>void ask()}>{busy?"Working…":"Send"}</button></div><div className="chat-disclaimer">OCR and selected source text are processed by DeepSeek only when requested. Verify OCR figures against the original. Chat never approves or posts entries to AutoCount.</div></div></div></div>;
 }

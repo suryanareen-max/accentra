@@ -1,6 +1,7 @@
 import { extractCsv, extractDocx, extractPdf, extractSpreadsheet, extractText } from "../../../../../lib/reader";
 import { getDocument, readDocumentFile, updateDocument } from "../../../../../lib/document-store";
 import { listJournalPostings } from "../../../../../lib/journal-postings";
+import { needsOcr } from "../../../../../lib/ocr";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,6 +22,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (pdf) { extracted.quality.pages = pdf.pages; extracted.source_pages = pdf.sourcePages; }
     if (spreadsheet) extracted.source_rows = spreadsheet.rows;
     if (image || (pdf && !pdf.text.trim())) extracted.quality.is_scanned = true;
+    const pendingPages = image ? [1] : pdf?.sourcePages.filter((page) => needsOcr(page.text)).map((page) => page.page) ?? [];
+    if (pendingPages.length) extracted.ocr = { status: "pending", pendingPages, processedPages: [], warnings: [] };
     const next = await updateDocument(id, { state: "NEEDS_REVIEW", extracted, worksheet: undefined, classified: undefined, validation: undefined });
     return Response.json({ document: next, agent: { name: "Document Reader", version: "reader-v1-local", mode: "deterministic-fallback" } });
   } catch (error) {

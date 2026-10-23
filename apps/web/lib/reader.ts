@@ -68,3 +68,15 @@ export async function extractDocx(bytes: Uint8Array) {
   const result = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
   return result.value;
 }
+
+export async function renderPdfPages(bytes: Uint8Array, pages: number[]) {
+  const canvas = await import("@napi-rs/canvas");
+  const globals = globalThis as unknown as Record<string, unknown>;
+  globals.DOMMatrix ??= canvas.DOMMatrix; globals.ImageData ??= canvas.ImageData; globals.Path2D ??= canvas.Path2D;
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data: bytes });
+  try {
+    const result = await parser.getScreenshot({ partial: pages, desiredWidth: 1500, imageBuffer: true, imageDataUrl: false });
+    return result.pages.map((page) => ({ page: page.pageNumber, data: page.data }));
+  } finally { await parser.destroy(); }
+}

@@ -30,6 +30,7 @@ export const config = {
     "/api/reviews/:path*",
     "/api/postings/:path*",
     "/api/chat",
+    "/api/conversations/:path*",
     "/api/autocount/:path*",
     "/api/audit/:path*",
     "/post-queue/:path*",

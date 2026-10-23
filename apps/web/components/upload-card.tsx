@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "../lib/auth/client";
+import { prepareDocument } from "../lib/prepare-document";
 import { readUploadResponse } from "../lib/upload-response";
 
 const accepted = ".pdf,.jpg,.jpeg,.png,.heic,.xlsx,.xls,.csv,.docx";
@@ -20,11 +21,9 @@ export function UploadCard() {
       const uploadResponse = await fetch(payload.uploadUrl, { method: "POST", body: form });
       await readUploadResponse(uploadResponse, "Saving document");
       setStatus("extracting"); setMessage("Reading the document and preparing fields for review…");
-      const extraction = await fetch(payload.extractUrl, { method: "POST" }); const result = await readUploadResponse(extraction, "Reading document");
-      const classified = await fetch(`/api/documents/${result.document.id}/classify`, { method: "POST" });
-      const classifiedResult = await readUploadResponse(classified, "Classifying document");
-      const url = `/review/${result.document.id}`;
-      setStatus("done"); setReviewUrl(url); setMessage(`${classifiedResult.document.worksheet?.journals.length ?? 0} journal proposal(s) prepared. Open the accountant workpaper to review dates, amounts and accounts.`);
+      const document = await prepareDocument(payload.document.id, setMessage);
+      const url = `/review/${document.id}`;
+      setStatus("done"); setReviewUrl(url); setMessage(`${document.worksheet?.journals.length ?? 0} journal proposal(s) prepared. Open the accountant workpaper to review dates, amounts and accounts.`);
       return url;
     } catch (error) {
       setStatus("error"); setMessage(error instanceof Error ? error.message : "Upload failed. Please try again.");

@@ -1,4 +1,5 @@
 "use client";
+import { prepareDocument } from "../lib/prepare-document";
 
 import { useEffect, useState } from "react";
 import type { AccountingWorksheet, JournalDraft, JournalLine } from "../lib/contracts";
@@ -52,10 +53,10 @@ export function AccountingWorkpaper({ documentId, filename, initialWorksheet, in
   async function reanalyse() {
     setBusy("analyse"); setMessage("");
     try {
-      const extraction = await readUploadResponse(await fetch(`/api/documents/${documentId}/extract`, { method: "POST" }), "Reading original document");
-      const result = await readUploadResponse(await fetch(`/api/documents/${documentId}/classify`, { method: "POST" }), "Preparing journal proposals");
-      setWorksheet(result.document.worksheet); setSourceText(extraction.document.extracted.source_text || ""); setDirty(false);
-      setMessage(`Prepared ${result.document.worksheet.journals.length} journal proposal(s). Confirm dates, amounts and account mapping against the source.`);
+      const document = await prepareDocument(documentId, setMessage, true);
+      if (!document.worksheet) throw new Error("Journal preparation did not complete. Retry the document.");
+      setWorksheet(document.worksheet); setSourceText(document.extracted?.source_text || ""); setDirty(false);
+      setMessage(`Prepared ${document.worksheet.journals.length} journal proposal(s). Verify OCR text, dates, amounts and account mapping against the original.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to analyse."); }
     finally { setBusy(""); }
   }

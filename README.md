@@ -91,3 +91,15 @@ The analyst is read-only: it cannot save, confirm, approve or send entries. Use 
 The dashboard list has numbered pages and 10/20/50 documents per page. The delete icon moves a document to Trash, with Undo and a persistent Trash/Restore view. This does not remove source storage, review history or AutoCount postings. Trashed documents are excluded from active document APIs, source analysis, workpapers and validation until restored.
 
 Read-only chat requests retry one interrupted network connection. Questions and selected documents remain available after a failed request. Session expiry returns a sign-in action rather than a raw fetch error. Greetings use a short DeepSeek call without querying the full document register or public standards search.
+
+### OCR, annotations and saved conversations
+
+Scanned PDF pages and image uploads now use DeepSeek Flash vision for AI OCR. Text-rich PDF pages retain native extraction; sparse/scanned pages are rendered server-side and transcribed in batches of at most two pages per request. Completed pages are retained if a later batch fails. OCR values must be compared with the original before approving journal entries. HEIC images that cannot be decoded must be converted to PNG/JPEG.
+
+In Ask Accentra, attaching a file saves it without immediately starting analysis. Preview the original, add reviewer notes, and use **Save notes**, **Read / OCR**, or **Analyse document**. Reading/OCR lets you inspect the transcription first. Annotations remain separate from source evidence and are captured with each saved question. Existing reviewed workpapers are not replaced by simply reading an attachment.
+
+The `chat_conversations` migration stores conversations in Neon under the authenticated user's ID. **New chat**, **History**, and title search let users reopen the most recent 100 conversations. Questions, answers, selected document, annotations and search settings survive refreshes. Concurrent requests are guarded and completed request IDs are cached to avoid duplicating saved answers during connection recovery. Older chats created before this feature cannot be recovered because they previously existed only in browser memory.
+
+The dashboard shows summary cards before documents. Its former Workspace records box is replaced by a bottom-right **Ask Accentra** popup, sharing the same saved conversations as `/chat`.
+
+Apply schema changes with `pnpm --dir apps/web db:migrate` before deploying this version.

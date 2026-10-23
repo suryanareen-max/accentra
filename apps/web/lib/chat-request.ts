@@ -2,7 +2,7 @@ import type { AnalysisResult, ConversationTurn } from "./deepseek";
 export class ChatRequestError extends Error {
   constructor(message: string, public signInRequired = false) { super(message); }
 }
-type ChatInput = { message: string; mode: "books" | "document" | "standards"; documentId?: string; history?: ConversationTurn[]; search: boolean };
+type ChatInput = { conversationId?: string; requestId?: string; message: string; mode: "books" | "document" | "standards"; documentId?: string; history?: ConversationTurn[]; search: boolean };
 // Chat analysis is read-only. Retry an interrupted connection once; never retry a posting/upload here.
 export async function requestChat(input: ChatInput, onRetry?: () => void): Promise<AnalysisResult> {
   for (let attempt = 0; attempt < 2; attempt++) {

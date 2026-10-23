@@ -10,6 +10,7 @@ export type Field<T> = {
 };
 
 export type ExtractedDocument = {
+  ocr?: { status: "pending" | "complete"; pendingPages: number[]; processedPages: number[]; warnings: string[] };
   source_text?: string;
   source_pages?: Array<{ page: number; text: string }>;
   source_rows?: Array<Record<string, string>>;
