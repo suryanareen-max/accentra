@@ -8,7 +8,7 @@ export function makeJournalPayload(j: JournalDraft, documentId: string) {
     master: {
       docNo: `ACC-${documentId.replaceAll("-", "").slice(0, 16)}-${j.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 24)}`,
       docNo2: j.reference.slice(0, 25), docDate: j.date, currencyCode: j.currency,
-      currencyRate: j.currencyRate, journalType: "GENERAL", description: j.description.slice(0, 80),
+      currencyRate: 1, journalType: "GENERAL", description: j.description.slice(0, 80),
     },
     details: j.lines.map((l) => ({ accNo: l.accountCode, toAccountRate: 1, ref: j.reference.slice(0, 20), description: (l.description || j.description).slice(0, 100), furtherDescription: l.description || j.description, dr: l.debit, cr: l.credit, taxCode: l.taxCode || null, deptNo: l.department || null, name: j.party.slice(0, 100), inclusiveTax: true })),
     autoFillOption: { taxCode: false, tariffCode: false }, saveApprove: false,

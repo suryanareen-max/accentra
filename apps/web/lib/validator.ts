@@ -16,9 +16,7 @@ export function validateDocument(doc: ExtractedDocument, tx: ClassifiedTransacti
   if (doc.document.date.value === null) findings.push(finding("R4", "error", "A document date is required before this can be posted.", ["document.date"], true));
   if (doc.totals.total.value === null) findings.push(finding("R2", "error", "A printed total is required before this can be posted.", ["totals.total"], true));
   if (tx.party.type !== "NONE" && !tx.party.code) findings.push(finding("R8", "error", "A valid customer or supplier code is required.", ["party.code"], true));
-  if (tx.entries.some((line) => line.tax_code !== null && !["SST-0", "SST-6", "SST-8"].includes(line.tax_code))) findings.push(finding("R9", "error", "The selected tax code is not in the synced tax-code table.", ["entries.tax_code"], true));
   if (doc.totals.total.value !== null && doc.totals.total.value > 10000) findings.push(finding("R12", "warning", "This amount is above the default approval threshold and needs a second reviewer.", ["totals.total"], false));
-  if (tx.period.currency_rate <= 0) findings.push(finding("R10", "warning", "A valid currency rate is required for review.", ["period.currency_rate"], false));
   if (doc.document.number.value !== null && /statement|summary/i.test(doc.document.number.value)) findings.push(finding("R11", "warning", "The document number looks like a statement or summary reference; confirm it is a transaction.", ["document.number"], false));
   if (doc.supplier.email.value && !doc.supplier.name.value) findings.push(finding("R14", "warning", "Supplier details are incomplete; verify bank and vendor-master details before posting.", ["supplier"], false));
   if (doc.totals.total.value !== null && doc.totals.total.value > 50000) findings.push(finding("R15", "warning", "This is an unusually large amount for the local review baseline.", ["totals.total"], false));

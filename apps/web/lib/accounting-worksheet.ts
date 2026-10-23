@@ -7,7 +7,13 @@ const amounts = (s: string) => [...s.matchAll(/-?\b\d[\d,]*\.\d{2}\b/g)].map((m)
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 const IFRS = "https://www.ifrs.org/issued-standards/list-of-standards/";
 
-export function journalDate(raw: string, year = ""): string {
+export function todayKualaLumpur(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export function journalDate(raw: string, year = todayKualaLumpur().slice(0, 4)): string {
   let y = "", m = "", d = "";
   const iso = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   const local = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4}|yyyy)$/i);
@@ -31,10 +37,8 @@ export function journalIssues(j: JournalDraft): string[] {
   const issues: string[] = [];
   const totals = journalTotals(j);
   if (!j.reference.trim()) issues.push("Enter a source document reference.");
-  if (!j.date || journalDate(j.date) !== j.date) issues.push(`Confirm the full transaction date${j.rawDate ? ` (source: ${j.rawDate})` : ""}; do not assume the year.`);
-  if (!/^[A-Z]{3}$/.test(j.currency)) issues.push("Confirm the transaction currency.");
-  if (!Number.isFinite(j.currencyRate) || j.currencyRate <= 0) issues.push("Enter a positive exchange rate.");
-  if (j.currency && j.currency !== "MYR" && j.currencyRate === 1) issues.push("Verify the foreign-currency exchange rate; 1 is not accepted as a default.");
+  if (!j.date || journalDate(j.date) !== j.date) issues.push("Enter a valid transaction date.");
+  if (j.currency !== "MYR") issues.push("Transaction currency must be MYR.");
   if (!j.description.trim()) issues.push("Add a journal narration.");
   if (j.amount === null || !Number.isFinite(j.amount) || j.amount <= 0) issues.push("Confirm a positive source transaction amount.");
   if (j.lines.length < 2) issues.push("At least two journal lines are required.");
@@ -43,7 +47,6 @@ export function journalIssues(j: JournalDraft): string[] {
   if (totals.difference !== 0) issues.push(`Debits and credits differ by ${totals.difference.toFixed(2)}.`);
   if (totals.debit <= 0) issues.push("The journal total must be greater than zero.");
   if (j.amount !== null && Math.abs(totals.debit - j.amount) > 0.005) issues.push("Journal debits must equal the confirmed source amount.");
-  if (!["no_tax_in_source", "nonrecoverable_in_cost", "split_verified"].includes(j.taxTreatment)) issues.push("Review tax treatment; source tax must not be assumed recoverable.");
   if (!j.treatment.trim()) issues.push("Document the accounting treatment and recognition basis.");
   if (j.lines.some((l) => Math.abs(l.debit - round(l.debit)) > 0.0000001 || Math.abs(l.credit - round(l.credit)) > 0.0000001)) issues.push("Debit and credit amounts must be rounded to currency cents.");
   if (/void|cancelled/i.test(j.kind)) issues.push("Voided or cancelled examples cannot be posted as new transactions.");
@@ -80,7 +83,7 @@ function line(code: string, name: string, amount: number, debit: boolean, descri
 }
 
 export function blankJournal(id = "manual-1"): JournalDraft {
-  return { id, reference: "", date: "", rawDate: "", currency: "MYR", currencyRate: 1, party: "", description: "", kind: "JOURNAL", recommendedModule: "General ledger journal", amount: null, taxAmount: null, taxTreatment: "unreviewed", lines: [line("", "", 0, true, ""), line("", "", 0, false, "")], treatment: "Accountant to determine treatment from the source evidence.", standards: [], evidence: { page: 1, excerpt: "" }, assumptions: [], included: true, confirmed: false, source: "manual" };
+  return { id, reference: "", date: todayKualaLumpur(), rawDate: "", currency: "MYR", currencyRate: 1, party: "", description: "", kind: "JOURNAL", recommendedModule: "General ledger journal", amount: null, taxAmount: null, taxTreatment: "unreviewed", lines: [line("", "", 0, true, ""), line("", "", 0, false, "")], treatment: "Accountant to determine treatment from the source evidence.", standards: [], evidence: { page: 1, excerpt: "" }, assumptions: [], included: true, confirmed: false, source: "manual" };
 }
 
 function cashAccount(text: string) {
@@ -117,8 +120,8 @@ function tableJournals(doc: ExtractedDocument): JournalDraft[] {
       const before = prefixRegion.slice(previousValue ? previousValue.index! + previousValue[0].length : 0).replaceAll("<<New>>", "");
       const partyCode = [...before.matchAll(/\b([34]00-[A-Z]\d+)\b/g)].at(-1)?.[1] || "";
       const j = blankJournal(`source-${page.page}-${result.length + 1}`);
-      j.source = "extracted"; j.reference = reference; j.rawDate = clean(m[2]); j.date = journalDate(j.rawDate);
-      j.currency = doc.document.currency.value || "";
+      j.source = "extracted"; j.reference = reference; j.rawDate = clean(m[2]); j.date = journalDate(j.rawDate) || todayKualaLumpur();
+      j.currency = "MYR";
       j.evidence = { page: page.page, excerpt: clean(before + " " + body).slice(0, 1800) };
       j.party = partyCode; j.description = `${reference} - ${sourceAccounts.map((a) => a.name).join("; ") || "transaction from source"}`;
       const prefix = reference.split("-")[0].toUpperCase();
@@ -156,9 +159,8 @@ function tableJournals(doc: ExtractedDocument): JournalDraft[] {
         j.amount = total;
         j.lines = [line(bank.code, bank.name, total, prefix === "OR", j.description), line(partyCode, prefix === "OR" ? "Customer receivable - confirm" : "Supplier payable - confirm", total, prefix !== "OR", j.description)];
       }
-      j.taxTreatment = /Tax\s*:\s*No Tax/i.test(doc.source_text || "") ? "no_tax_in_source" : "unreviewed";
       if (/void[^\n]{0,80}/i.test(page.text.slice(m.index! + m[0].length, end)) || (new RegExp(`voucher\\s+${reference}\\s+was.*?void`, "is")).test(page.text)) { j.kind = "VOIDED_EXAMPLE"; j.included = false; }
-      if (!j.date) j.assumptions.push("The source omits the financial year. Enter the year or a full date before posting.");
+      if (!j.rawDate) j.assumptions.push("No source date was identified. The transaction date defaults to today and should be checked before posting.");
       const treatment = treatmentFor(j.kind, j.description + " " + j.evidence.excerpt);
       j.treatment = treatment.text; j.standards = treatment.standards;
       result.push(j);
@@ -172,8 +174,7 @@ function structuredJournals(doc: ExtractedDocument): JournalDraft[] {
   const groups = new Map<string, JournalDraft>();
   for (const [index, source] of (doc.source_rows || []).entries()) {
     const row = Object.fromEntries(Object.entries(source).map(([k, v]) => [k.toLowerCase().replace(/[^a-z]/g, ""), String(v).trim()]));
-    const date = row.date || row.docdate || row.transactiondate;
-    if (!date) continue;
+    const date = row.date || row.docdate || row.transactiondate || "";
     const ref = row.reference || row.docno || row.invoiceno || row.documentno || `ROW-${index + 1}`;
     const description = row.description || row.narration || row.details || "Imported transaction";
     const code = row.accountcode || row.accno || row.account || "";
@@ -182,8 +183,8 @@ function structuredJournals(doc: ExtractedDocument): JournalDraft[] {
     if (!debitRaw && !creditRaw && !value) continue;
     let j = groups.get(`${ref}|${date}`);
     if (!j) {
-      j = blankJournal(`row-${index + 1}`); j.source = "extracted"; j.reference = ref; j.rawDate = date; j.date = journalDate(date);
-      j.description = description; j.currency = row.currency || doc.document.currency.value || ""; j.party = row.supplier || row.customer || row.payee || "";
+      j = blankJournal(`row-${index + 1}`); j.source = "extracted"; j.reference = ref; j.rawDate = date; j.date = journalDate(date) || todayKualaLumpur();
+      j.description = description; j.currency = "MYR"; j.party = row.supplier || row.customer || row.payee || "";
       j.evidence = { page: 1, excerpt: JSON.stringify(source) }; j.lines = []; groups.set(`${ref}|${date}`, j); result.push(j);
     }
     if (debitRaw || creditRaw) {
@@ -205,8 +206,8 @@ function structuredJournals(doc: ExtractedDocument): JournalDraft[] {
 function singleJournal(doc: ExtractedDocument): JournalDraft[] {
   if (doc.doc_family === "UNKNOWN" || doc.doc_family === "BANK_STATEMENT") return [];
   const j = blankJournal("document-1");
-  j.source = "extracted"; j.reference = doc.document.number.value || ""; j.rawDate = doc.document.date.value || ""; j.date = journalDate(j.rawDate);
-  j.currency = doc.document.currency.value || ""; j.amount = doc.totals.total.value; j.taxAmount = doc.totals.tax.value;
+  j.source = "extracted"; j.reference = doc.document.number.value || ""; j.rawDate = doc.document.date.value || ""; j.date = journalDate(j.rawDate) || todayKualaLumpur();
+  j.currency = "MYR"; j.amount = doc.totals.total.value; j.taxAmount = doc.totals.tax.value;
   j.kind = doc.doc_family; j.party = doc.supplier.name.value || doc.customer.name.value || "";
   j.description = `${j.kind.replaceAll("_", " ")} ${j.reference} ${j.party}`.trim();
   j.evidence = { page: doc.totals.total.page, excerpt: (doc.source_text || "").slice(0, 3000) };
@@ -221,8 +222,7 @@ function singleJournal(doc: ExtractedDocument): JournalDraft[] {
     j.assumptions.push("A receipt does not establish whether this is a sale, customer collection, capital contribution or deposit. Confirm the purpose.");
   } else j.lines = [line("", name, amount, true, j.description), line("", "Supplier payable", amount, false, j.description)];
   j.recommendedModule = j.kind === "SALES_INVOICE" ? "Sales invoice" : j.kind === "PURCHASE_INVOICE" ? "Purchase invoice" : "Cash book receipt / payment";
-  j.taxTreatment = /no tax|tax exempt/i.test(text) ? "no_tax_in_source" : "unreviewed";
-  if (j.taxAmount) j.assumptions.push(`Source tax ${j.taxAmount.toFixed(2)} is included in the gross journal proposal. Confirm recoverability and split to the proper tax account if applicable.`);
+  if (!j.rawDate) j.assumptions.push("No source date was identified. The transaction date defaults to today and should be checked before posting.");
   const treatment = treatmentFor(j.kind, text); j.treatment = treatment.text; j.standards = treatment.standards;
   return [j];
 }
@@ -239,12 +239,13 @@ function stockAdjustmentJournals(doc: ExtractedDocument): JournalDraft[] {
       const quantity = Number(row[3]), unitCost = numericAmount(row[4]), amount = round(Math.abs(quantity * unitCost));
       if (!quantity || !Number.isFinite(amount) || amount <= 0) continue;
       const j = blankJournal(`stock-${page.page}-${result.length + 1}`);
-      j.source = "extracted"; j.reference = `STOCK-${row[1]}`; j.rawDate = rawDate; j.date = journalDate(rawDate); j.currency = doc.document.currency.value || "";
+      j.source = "extracted"; j.reference = `STOCK-${row[1]}`; j.rawDate = rawDate; j.date = journalDate(rawDate) || todayKualaLumpur(); j.currency = "MYR";
       j.kind = "STOCK_ADJUSTMENT"; j.recommendedModule = "Stock adjustment - confirm inventory system";
       j.description = `Stock adjustment ${row[1]} ${row[2]}: ${quantity} × ${unitCost.toFixed(2)}`; j.amount = amount;
       j.lines = [line("", "Inventory - confirm stock valuation account", amount, quantity > 0, j.description), line("", "Inventory adjustment / variance - determine cause", amount, quantity < 0, j.description)];
       j.evidence = { page: page.page, excerpt: `${section.slice(0, 500)}\nSource row: ${row[0]}\nCalculated value: ${quantity} × ${unitCost.toFixed(2)} = ${(quantity * unitCost).toFixed(2)}` };
       j.assumptions = ["This is a proposed value effect of an explicit quantity adjustment, not a product selling price. Confirm quantity, valuation basis and cause of the variance.", "Confirm the periodic/perpetual inventory policy. A stock-module adjustment may already generate the GL effect; do not post the same movement twice."];
+      if (!j.rawDate) j.assumptions.push("No source date was identified. The transaction date defaults to today and should be checked before posting.");
       const treatment = treatmentFor(j.kind, "inventory stock adjustment"); j.treatment = treatment.text; j.standards = treatment.standards;
       result.push(j);
     }
@@ -257,8 +258,8 @@ export function buildWorksheet(doc: ExtractedDocument): AccountingWorksheet {
   const table = tableJournals(doc);
   const rows = table.length ? table : [...structuredJournals(doc), ...stockAdjustmentJournals(doc)];
   const journals = rows.length ? rows : training ? [] : singleJournal(doc);
-  const notices = ["Account codes must be matched to your company's actual AutoCount chart; suggested names are not synced accounts.", "Journal proposals require review of source evidence, recognition, tax and the financial period. No transaction is posted automatically."];
-  if (training) notices.unshift("Training/course material detected. Examples are shown for analysis, not as evidence of actual company transactions. Placeholder years are intentionally left blank.");
+  const notices = ["All proposed transactions use MYR. Source amounts are carried into MYR without exchange conversion. Missing or incomplete source dates default to today's date in Malaysia time; edit the transaction date if needed.", "Account codes must be matched to your company's actual AutoCount chart; suggested names are not synced accounts.", "Before sending a GL journal, complete every asterisked field, confirm the source represents a real company transaction, balance the debit and credit entries, and review the proposal."];
+  if (training) notices.unshift("Training/course material detected. Examples are shown for analysis, not as evidence of actual company transactions.");
   if (!journals.length) notices.push("No reliable transaction rows were identified. Read the source text below, supply a clearer transaction document, or enter a journal manually. Product prices and setup instructions are not transaction totals.");
   if (!journals.length && doc.quality.is_scanned) notices.push("The document may be an image or scanned pages. Image OCR is not configured: compare the original file and transcribe verified transactions, or provide a machine-readable source.");
   return { version: 1, sourceKind: training ? "training_material" : journals.length ? "business_document" : "unstructured", businessEvidenceConfirmed: false, financialYear: "", journals, notices, generatedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
@@ -266,7 +267,7 @@ export function buildWorksheet(doc: ExtractedDocument): AccountingWorksheet {
 
 export function worksheetCsv(w: AccountingWorksheet): string {
   const cell = (x: unknown) => { const value = typeof x === "string" && /^[=+@-]/.test(x) ? `'${x}` : String(x ?? ""); return `"${value.replaceAll('"', '""')}"`; };
-  const header = ["Reference", "Date", "Currency", "Exchange rate", "Party", "Narration", "Account code", "Account name", "Debit", "Credit", "Tax code", "Department", "Source page", "Treatment", "Reviewed"];
-  const rows = w.journals.filter((j) => j.included).flatMap((j) => j.lines.map((l) => [j.reference, j.date, j.currency, j.currencyRate, j.party, l.description || j.description, l.accountCode, l.accountName, l.debit.toFixed(2), l.credit.toFixed(2), l.taxCode, l.department, j.evidence.page, j.treatment, j.confirmed ? "Yes" : "No"]));
+  const header = ["Reference", "Transaction date", "Currency", "Party", "Narration", "Account code", "Account name", "Debit", "Credit", "Department", "Source page", "Treatment", "Reviewed"];
+  const rows = w.journals.filter((j) => j.included).flatMap((j) => j.lines.map((l) => [j.reference, j.date, "MYR", j.party, l.description || j.description, l.accountCode, l.accountName, l.debit.toFixed(2), l.credit.toFixed(2), l.department, j.evidence.page, j.treatment, j.confirmed ? "Yes" : "No"]));
   return [header, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
 }

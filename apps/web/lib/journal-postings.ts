@@ -17,7 +17,6 @@ export async function postJournal(documentId: string, j: JournalDraft) {
   const missing = j.lines.filter((l) => !accounts.some((a) => a.code === l.accountCode));
   if (missing.length) throw new Error(`Accounts not found as postable leaf accounts in your AutoCount book: ${missing.map((l) => l.accountCode).join(", ")}. Sync and correct the mapping first.`);
   if (j.currency !== "MYR" || j.lines.some((l) => accounts.find((a) => a.code === l.accountCode)?.currency !== "MYR")) throw new Error("Foreign-currency journals require account conversion-rate setup before direct posting. Export and review the currency treatment first.");
-  if (j.lines.some((l) => l.taxCode)) throw new Error("Tax-coded native journals require tax amount reconciliation. Export the worksheet and complete tax setup before direct posting.");
   const request = makeJournalPayload(j, documentId);
   const [document] = await db.select({ tenantId: documents.tenantId }).from(documents).where(eq(documents.id, documentId)).limit(1);
   if (!document) throw new Error("Document not found.");
