@@ -169,7 +169,24 @@ h1 { font-size: 32px; letter-spacing: -0.045em; margin: 0; }
 .transaction-register{width:100%;min-width:1000px;border-collapse:collapse;font-size:12px}.transaction-register th{padding:13px;text-align:left;background:#edf5ef;color:#4a6754}.transaction-register td{padding:13px;border-top:1px solid #e2ebe5;font-variant-numeric:tabular-nums}.transaction-register td:nth-child(n+4){text-align:right}.transaction-register td:last-child{text-align:left}.transaction-register a{color:#24744a;font-weight:600}.journal-paper{scroll-margin-top:20px}
 .workpaper-main{width:100%;box-sizing:border-box}.workpaper,.workpaper>*{min-width:0}.journal-paper,.journal-table-wrap{min-width:0;max-width:100%}
 
-.analysis-result .chat-answer { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; }
+.analysis-result .chat-answer { overflow-wrap: anywhere; line-height: 1.7; }
+.analysis-result .chat-answer > :first-child { margin-top: 0; }
+.analysis-result .chat-answer > :last-child { margin-bottom: 0; }
+.analysis-result .chat-answer h1, .analysis-result .chat-answer h2, .analysis-result .chat-answer h3, .analysis-result .chat-answer h4 { color: #173c30; line-height: 1.3; margin: 1.2em 0 .45em; }
+.analysis-result .chat-answer h1 { font-size: 1.35em; }
+.analysis-result .chat-answer h2 { font-size: 1.2em; }
+.analysis-result .chat-answer h3, .analysis-result .chat-answer h4 { font-size: 1.05em; }
+.analysis-result .chat-answer p, .analysis-result .chat-answer ul, .analysis-result .chat-answer ol, .analysis-result .chat-answer blockquote { margin: .55em 0; }
+.analysis-result .chat-answer ul, .analysis-result .chat-answer ol { padding-left: 1.5em; }
+.analysis-result .chat-answer li + li { margin-top: .25em; }
+.analysis-result .chat-answer blockquote { border-left: 3px solid #9bc7ae; padding: .4em .8em; color: #526b5e; background: #eaf4ee; }
+.analysis-result .chat-answer code { background: #e5eee8; border-radius: 4px; padding: .1em .3em; font-size: .92em; }
+.analysis-result .chat-answer pre { white-space: pre-wrap; overflow-x: auto; background: #e5eee8; border-radius: 7px; padding: 10px; }
+.analysis-result .chat-answer .markdown-table-wrap { max-width: 100%; overflow-x: auto; margin: .8em 0; }
+.analysis-result .chat-answer table { width: 100%; border-collapse: collapse; background: #fff; font-size: .95em; }
+.analysis-result .chat-answer th, .analysis-result .chat-answer td { border: 1px solid #d8e5dd; padding: 8px 10px; text-align: left; vertical-align: top; }
+.analysis-result .chat-answer th { background: #e8f2ec; color: #173c30; font-weight: 700; }
+.analysis-result .chat-answer tr:nth-child(even) td { background: #f8fbf9; }
 .analysis-turn { padding: 20px 0; border-bottom: 1px solid var(--line, #dfe7e1); }
 .analysis-search { display: flex; align-items: center; gap: 9px; font-size: 13px; padding: 14px 0; }
 .analysis-search input { width: auto; }
