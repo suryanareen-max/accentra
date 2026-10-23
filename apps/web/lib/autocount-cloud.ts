@@ -45,8 +45,21 @@ export async function sendCloudJournal(j: JournalDraft, documentId: string) {
   }
   const location = response.headers.get("location");
   const docNo = location ? new URL(location, `${base}/`).searchParams.get("docNo") || payload.master.docNo : payload.master.docNo;
-  const readback = await fetch(`${base}/journalEntry?docNo=${encodeURIComponent(docNo)}`, { headers, cache: "no-store", signal: AbortSignal.timeout(20000) });
-  const actual = await readback.json().catch(() => null);
-  const reconciled = readback.ok && actual && matchesPostedJournal(payload, actual);
-  return { docNo, location: `${base}/journalEntry?docNo=${encodeURIComponent(docNo)}`, payload, response: actual, reconciled: Boolean(reconciled) };
+  const locationUrl = `${base}/journalEntry?docNo=${encodeURIComponent(docNo)}`;
+  try {
+    const verified = await verifyCloudJournal(payload, docNo);
+    return { ...verified, payload };
+  } catch (error) {
+    // The create already returned 201. Preserve its AutoCount reference and
+    // let the user safely re-run read-only verification without resubmitting.
+    return { docNo, location: locationUrl, payload, response: null, reconciled: false, verificationError: error instanceof Error ? error.message : "AutoCount saved the journal, but read-back failed." };
+  }
+}
+
+export async function verifyCloudJournal(expected: ReturnType<typeof makeJournalPayload>, docNo: string) {
+  const { base, headers } = connection();
+  const response = await fetch(`${base}/journalEntry?docNo=${encodeURIComponent(docNo)}`, { headers, cache: "no-store", signal: AbortSignal.timeout(20000) });
+  const actual = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(actual?.message || `AutoCount read-back returned HTTP ${response.status}.`);
+  return { docNo, location: `${base}/journalEntry?docNo=${encodeURIComponent(docNo)}`, response: actual, reconciled: Boolean(actual && matchesPostedJournal(expected, actual)) };
 }

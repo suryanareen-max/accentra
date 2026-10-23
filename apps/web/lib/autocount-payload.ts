@@ -16,7 +16,17 @@ export function makeJournalPayload(j: JournalDraft, documentId: string) {
 }
 
 export function matchesPostedJournal(expected: ReturnType<typeof makeJournalPayload>, actual: { master?: Record<string, unknown>; details?: Array<Record<string, unknown>> }) {
-  if (String(actual.master?.docDate || "").slice(0, 10) !== expected.master.docDate || actual.master?.currencyCode !== expected.master.currencyCode) return false;
+  const normalizeDate = (value: unknown) => {
+    const text = String(value || "").trim();
+    const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(text);
+    if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+    // AutoCount Cloud may serialize a date-only value using the server's
+    // locale, for example "10/23/2026 00:00:00" (MM/DD/YYYY).
+    const localized = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(text);
+    if (localized) return `${localized[3]}-${localized[1].padStart(2, "0")}-${localized[2].padStart(2, "0")}`;
+    return "";
+  };
+  if (normalizeDate(actual.master?.docDate) !== normalizeDate(expected.master.docDate) || actual.master?.currencyCode !== expected.master.currencyCode) return false;
   const normalized = (lines: Array<{ accNo?: unknown; dr?: unknown; cr?: unknown }>) => lines.map((l) => `${l.accNo}|${Math.round(Number(l.dr || 0) * 100)}|${Math.round(Number(l.cr || 0) * 100)}`).sort();
   return JSON.stringify(normalized(expected.details)) === JSON.stringify(normalized(actual.details || []));
 }

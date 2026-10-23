@@ -60,7 +60,7 @@ export function AccountingWorkpaper({ documentId, filename, initialWorksheet, su
   const [connection, setConnection] = useState<Connection>({ configured: false, missing: [], accountBookId: "", accounts: [] });
   const [submissions, setSubmissions] = useState(initialSubmissions);
   const [connectionLoaded, setConnectionLoaded] = useState(false);
-  const [busy, setBusy] = useState(""); const [message, setMessage] = useState(""); const [dirty, setDirty] = useState(needsDefaultsSaved);
+  const [busy, setBusy] = useState(""); const [message, setMessage] = useState(""); const [successToast, setSuccessToast] = useState(""); const [dirty, setDirty] = useState(needsDefaultsSaved);
   const attemptedValidation = useRef("");
   const issues = worksheetIssues(worksheet);
   const selected = worksheet.journals.filter((j) => j.included);
@@ -129,8 +129,27 @@ export function AccountingWorkpaper({ documentId, filename, initialWorksheet, su
       const response = await fetch("/api/postings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ documentId, journalId }) });
       const result = await response.json();
       if (result.posting) setSubmissions((old) => [...old.filter((p) => p.id !== result.posting.id), { ...result.posting, journalId }]);
+      if (result.posting?.status === "RECONCILED") {
+        const reference = worksheet.journals.find((j) => j.id === journalId)?.reference;
+        setSuccessToast(`General journal entry${reference ? ` ${reference}` : ""} has been posted to AutoCount successfully.`);
+      }
       setMessage(result.message || result.error || (response.ok ? "Journal submitted." : "Posting failed."));
     } catch (error) { setMessage(error instanceof Error ? error.message : "Posting result unknown. Check AutoCount before retrying."); }
+    finally { setBusy(""); }
+  }
+
+  async function verifyExisting(postingId: string, journalId: string) {
+    setBusy(`verify:${postingId}`); setMessage("");
+    try {
+      const response = await fetch(`/api/postings/${postingId}/retry`, { method: "POST" });
+      const result = await response.json();
+      if (result.posting) setSubmissions((old) => old.map((item) => item.id === postingId ? { ...item, ...result.posting, journalId } : item));
+      if (result.posting?.status === "RECONCILED") {
+        const reference = worksheet.journals.find((j) => j.id === journalId)?.reference;
+        setSuccessToast(`General journal entry${reference ? ` ${reference}` : ""} is in AutoCount and has been verified successfully.`);
+      }
+      setMessage(result.message || result.error || (response.ok ? "Existing AutoCount journal verified." : "Unable to verify the existing journal."));
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to verify the existing AutoCount journal. No new journal was sent."); }
     finally { setBusy(""); }
   }
 
@@ -138,6 +157,7 @@ export function AccountingWorkpaper({ documentId, filename, initialWorksheet, su
     <section className="workpaper-toolbar card section"><div><span className="eyebrow">ACCOUNTANT WORKPAPER · {filename}</span><h1>Transactions &amp; journal entries</h1><p>Review detected transactions, accounting treatment and balanced AutoCount journal entries.</p></div><div className="workpaper-actions"><a className="ghost-button" href="/dashboard">← Dashboard</a><a className="ghost-button" href={`/api/documents/${documentId}/file`} target="_blank" rel="noreferrer">Open original file ↗</a><button className="ghost-button" disabled={Boolean(busy) || dirty || submissions.length > 0} onClick={() => void reanalyse()}>{busy === "analyse" ? "Reading source…" : "Re-read original document"}</button></div></section>
 
     {message && <div role="status" className="workpaper-message">{message}</div>}
+    {successToast && <div role="status" className="posting-success-toast"><span aria-hidden="true">✓</span><span>{successToast}</span><button type="button" aria-label="Dismiss success message" onClick={() => setSuccessToast("")}>×</button></div>}
     <div className="workpaper-summary"><article><small>Transaction proposals</small><strong>{worksheet.journals.length}</strong></article><article><small>Included for review</small><strong>{selected.length}</strong></article><article><small>Review items remaining</small><strong>{issues.length}</strong></article><article><small>AutoCount connection</small><strong>{!connectionLoaded ? "Checking…" : connection.configured ? `Book ${connection.accountBookId}` : "Not connected"}</strong></article></div>
 
     <div className="workpaper-notice workpaper-required"><strong>Required before sending to AutoCount GL journal</strong><br />Complete every asterisked field and review each proposal. AutoCount account matches are suggested from your synced chart; verify them against the original document. Validation runs once automatically when the required details are complete and the review box is checked. Currency is MYR; an unrecognized date defaults to today and can be edited.</div>
@@ -166,7 +186,7 @@ export function AccountingWorkpaper({ documentId, filename, initialWorksheet, su
           {problems.length > 0 && <ul className="journal-issues">{problems.map((p) => <li key={p}>{p}</li>)}</ul>}
           <label className="workpaper-check journal-confirm"><input type="checkbox" checked={j.confirmed} onChange={(e) => patchJournal(j.id, { confirmed: e.target.checked }, false)} /><span>I confirm this is a company transaction and have reviewed its date, amount, accounts, debit/credit sides and treatment.<b className="required-mark"> *</b></span></label>
         </fieldset>
-        <div className="journal-submit"><div className="journal-send-status"><span className="doc-meta">{submitted ? `${submitted.status} · ${submitted.externalReference || "Result needs verification"}${submitted.lastError ? ` · ${submitted.lastError}` : ""}` : dirty && autoReady ? "Saving and validating automatically…" : j.confirmed && !dirty ? "Reviewed and validated" : "Draft · complete required fields and confirm review"}</span>{sendBlocker && <small role="status">{sendBlocker}</small>}</div><button className="button" disabled={Boolean(busy) || Boolean(sendBlocker)} title={sendBlocker || "Send this reviewed journal to AutoCount"} onClick={() => void send(j.id)}>{busy === j.id ? "Sending…" : "Send as AutoCount GL journal"}</button></div>
+        <div className="journal-submit"><div className="journal-send-status"><span className="doc-meta">{submitted ? `${submitted.status} · ${submitted.externalReference || "Result needs verification"}${submitted.lastError ? ` · ${submitted.lastError}` : ""}` : dirty && autoReady ? "Saving and validating automatically…" : j.confirmed && !dirty ? "Reviewed and validated" : "Draft · complete required fields and confirm review"}</span>{sendBlocker && <small role="status">{sendBlocker}</small>}</div>{submitted && ["NEEDS_VERIFICATION", "MISMATCH"].includes(submitted.status) && <button className="button secondary" disabled={Boolean(busy)} onClick={() => void verifyExisting(submitted.id, j.id)}>{busy === `verify:${submitted.id}` ? "Checking AutoCount…" : "Verify existing AutoCount journal"}</button>}<button className="button" disabled={Boolean(busy) || Boolean(sendBlocker)} title={sendBlocker || "Send this reviewed journal to AutoCount"} onClick={() => void send(j.id)}>{busy === j.id ? "Sending…" : "Send as AutoCount GL journal"}</button></div>
       </section>;
     })}
     <section className="card section workpaper-export"><div><h2>Export &amp; handoff</h2><p>The CSV is an accountant workpaper. The validated JSON uses AutoCount's native journal input model; it is not an invoice or inventory import.</p>{dirty && <p className="workpaper-notice">Complete required fields and confirm review to trigger automatic save and validation.</p>}</div><div className="workpaper-actions">{!dirty && <a className="ghost-button" href={`/api/documents/${documentId}/journal/export`}>Download journal CSV</a>}{!dirty && !issues.length && <a className="ghost-button" href={`/api/documents/${documentId}/journal/export?format=json`}>Download AutoCount JSON</a>}<a className="link" href="/post-queue">Posting log →</a></div></section>

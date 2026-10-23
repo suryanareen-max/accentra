@@ -1,7 +1,12 @@
-import { eq } from "drizzle-orm";
-import { getDb } from "../../../../../lib/db";
-import { postings } from "../../../../../lib/db/schema";
+import { verifyJournalPosting } from "../../../../../lib/journal-postings";
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const [posting] = await getDb().select().from(postings).where(eq(postings.id, (await params).id));
-  return Response.json(posting ? { posting, error: "Verify this reference in AutoCount first. An ambiguous submission cannot be blindly retried." } : { error: "Posting not found" }, { status: posting ? 409 : 404 });
+  try {
+    const { posting, reconciled } = await verifyJournalPosting((await params).id);
+    return reconciled
+      ? Response.json({ posting, message: "The existing AutoCount journal was found and its date, currency, accounts and debit/credit amounts match. No new journal was created." })
+      : Response.json({ posting, error: "AutoCount returned a journal, but its details do not match this workpaper. No new journal was created; review the record manually." }, { status: 409 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to verify the existing AutoCount journal.";
+    return Response.json({ error: message }, { status: message === "Posting record not found." ? 404 : 502 });
+  }
 }

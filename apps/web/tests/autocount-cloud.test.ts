@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cloudStatus, fetchCloudAccounts, sendCloudJournal } from "../lib/autocount-cloud";
 import { blankJournal } from "../lib/accounting-worksheet";
+import { makeJournalPayload, matchesPostedJournal } from "../lib/autocount-payload";
 
 test("a missing API secret or account book cannot be treated as a connected mock adapter", () => {
   const saved = { key: process.env.AUTCOUNT_API_KEY, id: process.env.AUTCOUNT_KEY_ID, book: process.env.AUTCOUNT_ACCOUNT_BOOK_ID };
@@ -57,6 +58,50 @@ test("the documented AUTCOUNT_API_URL alias targets the configured account book"
   try {
     await fetchCloudAccounts();
     assert.ok(requestedUrl.startsWith("https://accounting-api.autocountcloud.com/74400/"));
+  } finally {
+    global.fetch = originalFetch;
+    names.forEach((n, i) => { if (originalEnv[i] === undefined) delete process.env[n]; else process.env[n] = originalEnv[i]; });
+  }
+});
+
+test("AutoCount read-back matches locale-formatted dates and balanced journal lines", () => {
+  const j = blankJournal("date-test");
+  Object.assign(j, { reference: "AC-INV-2026-1023-014", date: "2026-10-23", amount: 5000, description: "Sales invoice", treatment: "Services delivered", confirmed: true });
+  j.lines = [
+    { accountCode: "405-0000", accountName: "Trade Receivables", description: "Invoice receivable", debit: 5000, credit: 0, taxCode: "", department: "" },
+    { accountCode: "500-0000", accountName: "Sales Revenue", description: "Service revenue", debit: 0, credit: 5000, taxCode: "", department: "" },
+  ];
+  const expected = makeJournalPayload(j, "12345678-1234-1234-1234-123456789012");
+  const actual = { master: { docDate: "10/23/2026 00:00:00", currencyCode: "MYR" }, details: expected.details.map(({ accNo, dr, cr }) => ({ accNo, dr, cr })) };
+  assert.equal(matchesPostedJournal(expected, actual), true);
+});
+
+test("a read-back network failure preserves the successful AutoCount reference for safe verification", async () => {
+  const originalFetch = global.fetch;
+  const names = ["AUTCOUNT_API_KEY", "AUTCOUNT_KEY_ID", "AUTCOUNT_ACCOUNT_BOOK_ID", "AUTCOUNT_API_BASE_URL"];
+  const originalEnv = names.map((n) => process.env[n]);
+  process.env.AUTCOUNT_API_KEY = "unit-test-secret";
+  process.env.AUTCOUNT_KEY_ID = "unit-test-key-id";
+  process.env.AUTCOUNT_ACCOUNT_BOOK_ID = "74400";
+  process.env.AUTCOUNT_API_BASE_URL = "https://accounting-api.autocountcloud.com";
+  const calls: string[] = [];
+  global.fetch = (async (url: string | URL | Request, options?: RequestInit) => {
+    calls.push(String(url));
+    if (options?.method === "POST") return new Response(null, { status: 201, headers: { location: "https://accounting-api.autocountcloud.com/74400/journalEntry?docNo=JV-SAVED-123" } });
+    throw new Error("fetch failed");
+  }) as typeof fetch;
+  try {
+    const j = blankJournal("readback-failure");
+    Object.assign(j, { reference: "SOURCE-123", date: "2026-10-23", amount: 100, description: "Test revenue", treatment: "Service delivered", confirmed: true });
+    j.lines = [
+      { accountCode: "405-0000", accountName: "Receivables", description: "Invoice", debit: 100, credit: 0, taxCode: "", department: "" },
+      { accountCode: "500-0000", accountName: "Revenue", description: "Service", debit: 0, credit: 100, taxCode: "", department: "" },
+    ];
+    const result = await sendCloudJournal(j, "12345678-1234-1234-1234-123456789012");
+    assert.equal(result.docNo, "JV-SAVED-123");
+    assert.equal(result.reconciled, false);
+    assert.equal(result.verificationError, "fetch failed");
+    assert.equal(calls.length, 2, "the code performs one create and one read, never a second create");
   } finally {
     global.fetch = originalFetch;
     names.forEach((n, i) => { if (originalEnv[i] === undefined) delete process.env[n]; else process.env[n] = originalEnv[i]; });
