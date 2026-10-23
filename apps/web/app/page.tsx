@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "../lib/auth/server";
+
+export const dynamic = "force-dynamic";
 
 const features = [
   { number: "01", title: "From document to data", copy: "Invoices, statements and receipts become structured entries, with every figure linked back to its source." },
@@ -6,7 +10,9 @@ const features = [
   { number: "03", title: "People stay in control", copy: "Your team reviews every suggestion. Nothing is posted until someone approves it." },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth.getSession();
+  if (session.data?.user) redirect("/dashboard");
   return (
     <main className="marketing">
       <header className="marketing-nav">
