@@ -74,7 +74,22 @@ export async function renderPdfPages(bytes: Uint8Array, pages: number[]) {
   const globals = globalThis as unknown as Record<string, unknown>;
   globals.DOMMatrix ??= canvas.DOMMatrix; globals.ImageData ??= canvas.ImageData; globals.Path2D ??= canvas.Path2D;
   const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: bytes });
+  // PDF.js's default Node factory resolves canvas relative to its own pnpm
+  // directory, whose optional dependency link is absent in a Vercel bundle.
+  // Reuse the application's already-loaded native canvas instead.
+  class ServerCanvasFactory {
+    create(width: number, height: number) {
+      const surface = canvas.createCanvas(Math.ceil(width), Math.ceil(height));
+      return { canvas: surface, context: surface.getContext("2d") };
+    }
+    reset(target: { canvas: import("@napi-rs/canvas").Canvas }, width: number, height: number) {
+      target.canvas.width = Math.ceil(width); target.canvas.height = Math.ceil(height);
+    }
+    destroy(target: { canvas: import("@napi-rs/canvas").Canvas }) {
+      target.canvas.width = 0; target.canvas.height = 0;
+    }
+  }
+  const parser = new PDFParse({ data: bytes, CanvasFactory: ServerCanvasFactory });
   try {
     const result = await parser.getScreenshot({ partial: pages, desiredWidth: 1500, imageBuffer: true, imageDataUrl: false });
     return result.pages.map((page) => ({ page: page.pageNumber, data: page.data }));
