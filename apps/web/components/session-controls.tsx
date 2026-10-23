@@ -16,8 +16,14 @@ export function SessionControls() {
       if (result.error) throw new Error(result.error.message || "Could not sign out. Try again.");
       window.location.assign("/login");
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Could not sign out.");
-      setSigningOut(false);
+      try {
+        const response = await fetch("/api/session/sign-out", { method: "POST", credentials: "same-origin" });
+        if (!response.ok) throw new Error("The local session could not be cleared.");
+        window.location.assign("/login?signout=local");
+      } catch {
+        setMessage(err instanceof Error ? err.message : "Could not sign out. Try again.");
+        setSigningOut(false);
+      }
     }
   }
 

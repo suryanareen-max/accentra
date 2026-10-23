@@ -24,7 +24,7 @@ const headings: Record<string, { eyebrow: string; title: string; description: st
   },
 };
 
-export function AuthScreen({ path }: { path: string }) {
+export function AuthScreen({ path, signOutNotice = false }: { path: string; signOutNotice?: boolean }) {
   const heading = headings[path] ?? {
     eyebrow: "YOUR ACCENTRA ACCOUNT",
     title: "Your workspace awaits.",
@@ -58,6 +58,7 @@ export function AuthScreen({ path }: { path: string }) {
             <h2 id="auth-heading">{heading.title}</h2>
             <p>{heading.description}</p>
           </div>
+          {signOutNotice && <p className="auth-signout-notice" role="status">Signed out on this browser. Neon Auth also needs this site’s domain added to its trusted origins to revoke the server session immediately.</p>}
           <AuthView
             path={path}
             classNames={{
