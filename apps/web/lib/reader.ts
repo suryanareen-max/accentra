@@ -13,9 +13,10 @@ export function extractText(text: string, filename: string): ExtractedDocument {
   const family = training ? "UNKNOWN" : /bank statement/i.test(text) || /statement/i.test(filename) ? "BANK_STATEMENT" : /payment voucher|\bPV[-\s]/i.test(text) ? "PAYMENT_VOUCHER" : /sales invoice|tax invoice[\s\S]*customer/i.test(text) ? "SALES_INVOICE" : /receipt/i.test(text + filename) ? "RECEIPT" : /invoice|inv[-\s]/i.test(text + filename) ? "PURCHASE_INVOICE" : "UNKNOWN";
   const supplierName = match(text, /(?:supplier|vendor|from|seller)\s*[:#-]?\s*([^\n]+)/i);
   const documentNumber = match(text, /(?:invoice|receipt|document|doc|reference)\s*(?:no\.?|number|#)\s*[:#-]?\s*([A-Z0-9][A-Z0-9\-/]+)/i) ?? match(text, /\b((?:INV|PI|PV|OR|JV|CN|PR)-\d+)\b/i);
-  const date = match(text, /(?:date|issued)\s*[:#-]?\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})/i);
+  const date = match(text, /(?:transaction\s+date|invoice\s+date|date|issued)\s*[:#-]?\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}[\s-]+[A-Za-z]{3,9}(?:,?\s+\d{2,4})?|[A-Za-z]{3,9}\s+\d{1,2}(?:,?\s+\d{2,4})?)/i);
   const currency = match(text, /\b(MYR|RM|USD|SGD|EUR)\b/i)?.toUpperCase().replace("RM", "MYR") ?? null;
-  const totalRaw = match(text, /\b(?:grand\s+total|total\s+due|total\s+payable|invoice\s+total)\b\s*[:=]?\s*(?:RM|MYR|USD|SGD)?\s*([\d,]+(?:\.\d{1,2})?)/i) ?? match(text, /\btotal\b\s*[:=]?\s*(?:RM|MYR|USD|SGD)?\s*([\d,]+(?:\.\d{1,2})?)/i);
+  const totalLabels = "grand\\s+total|total\\s+due|total\\s+amount|total\\s+payable|invoice\\s+total|amount\\s+due|amount\\s+payable|net\\s+total";
+  const totalRaw = match(text, new RegExp(`\\b(?:${totalLabels})\\b\\s*[:=]?\\s*\\(?\\s*(?:RM|MYR|USD|SGD|EUR)\\s*\\)?\\s*([\\d,]+(?:\\.\\d{1,2})?)`, "i")) ?? match(text, new RegExp(`\\b(?:${totalLabels})\\b\\s*[:=]?\\s*([\\d,]+(?:\\.\\d{1,2})?)`, "i")) ?? match(text, /\btotal\b\s*[:=]?\s*\(?\s*(?:RM|MYR|USD|SGD|EUR)\s*\)?\s*([\d,]+(?:\.\d{1,2})?)/i) ?? match(text, /\btotal\b\s*[:=]?\s*([\d,]+(?:\.\d{1,2})?)/i);
   const taxRaw = match(text, /\b(?:sst|tax|gst)(?:\s+amount)?\s*(?::|=|RM|MYR)\s*(?:RM|MYR)?\s*([\d,]+(?:\.\d{1,2})?)/i);
   const total = money(totalRaw); const tax = money(taxRaw);
   const subtotal = money(match(text, /\bsub\s*total\b\s*[:=]?\s*(?:RM|MYR|USD|SGD)?\s*([\d,]+(?:\.\d{1,2})?)/i));

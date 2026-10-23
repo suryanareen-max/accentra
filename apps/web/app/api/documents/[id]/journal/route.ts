@@ -19,11 +19,13 @@ function sanitize(body: AccountingWorksheet, current: AccountingWorksheet): Acco
     const lines = j.lines.map((l): JournalLine => ({ accountCode: text(l.accountCode, 50).trim(), accountName: text(l.accountName, 150).trim(), description: text(l.description, 1000), debit: Number(l.debit), credit: Number(l.credit), taxCode: text(l.taxCode, 30), department: text(l.department, 30) }));
     if (lines.some((l) => !Number.isFinite(l.debit) || !Number.isFinite(l.credit))) throw new Error("Debit and credit amounts must be finite numbers.");
     const next: JournalDraft = { ...j, id: j.id, reference: text(j.reference, 100), date: text(j.date, 10) || todayKualaLumpur(), rawDate: original?.rawDate || "", currency: "MYR", currencyRate: 1, party: text(j.party, 150), description: text(j.description), kind: text(j.kind, 70), recommendedModule: original?.recommendedModule || "General ledger journal", amount: j.amount === null ? null : Number(j.amount), taxAmount: original?.taxAmount ?? null, taxTreatment: text(j.taxTreatment, 50), lines, treatment: text(j.treatment, 6000), standards: original?.standards || [], evidence: original?.evidence || { page: 1, excerpt: "Manually prepared from source evidence; confirm against original document." }, assumptions: original?.assumptions || [], included: j.included === true, confirmed: j.confirmed === true, source: original?.source || "manual", approvedAt: undefined };
-    if (next.confirmed && journalIssues(next).length === 0 && body.businessEvidenceConfirmed === true) next.approvedAt = new Date().toISOString();
+    if (next.confirmed && journalIssues(next).length === 0) next.approvedAt = new Date().toISOString();
     else next.approvedAt = undefined;
     return next;
   });
-  return { ...current, businessEvidenceConfirmed: body.businessEvidenceConfirmed === true, financialYear: text(body.financialYear, 4), journals, updatedAt: new Date().toISOString() };
+  const included = journals.filter((journal) => journal.included);
+  const reviewed = included.length > 0 && included.every((journal) => journal.confirmed && journalIssues(journal).length === 0);
+  return { ...current, businessEvidenceConfirmed: reviewed, financialYear: text(body.financialYear, 4), journals, updatedAt: new Date().toISOString() };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {

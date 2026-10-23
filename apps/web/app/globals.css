@@ -194,6 +194,10 @@ h1 { font-size: 32px; letter-spacing: -0.045em; margin: 0; }
 .document-delete-confirm, .document-undo { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px; margin-bottom: 12px; background: #fff6e7; border-radius: 6px; font-size: 13px; }
 .document-pagination { padding: 20px 0 8px; font-size: 12px; }
 .document-pagination .button { padding: 7px 10px; }
+ .document-selection-toolbar { display:flex; align-items:center; justify-content:flex-end; gap:12px; flex-wrap:wrap; padding:12px 0; border-bottom:1px solid #dfe7e1; font-size:12px; color:#607568; }
+ .document-selection-toolbar .button { padding:7px 10px; }
+ .document-select { display:flex; align-items:center; justify-content:center; width:28px; flex:0 0 28px; }
+ .document-select input { width:16px; height:16px; accent-color:#20754e; cursor:pointer; }
 @media (max-width: 650px) { .document-list-row .queue-row { flex-wrap: wrap; } .document-list-name { flex-basis: 75%; } .document-pagination > div { gap: 5px; } }
 
 .saved-chat { min-width: 0; }

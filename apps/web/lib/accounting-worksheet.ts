@@ -16,11 +16,14 @@ export function todayKualaLumpur(): string {
 export function journalDate(raw: string, year = todayKualaLumpur().slice(0, 4)): string {
   let y = "", m = "", d = "";
   const iso = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  const local = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4}|yyyy)$/i);
-  const named = raw.match(/^(\d{1,2})\s+([A-Za-z]+)(?:\s+(\d{4}))?$/);
+  const local = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4}|yyyy)$/i);
+  const named = raw.match(/^(\d{1,2})[\s-]+([A-Za-z]+)(?:,?\s+(\d{2,4}))?$/);
+  const monthFirst = raw.match(/^([A-Za-z]+)\s+(\d{1,2})(?:,?\s+(\d{2,4}))?$/);
   if (iso) [, y, m, d] = iso;
-  else if (local) { [, d, m, y] = local; if (/yyyy/i.test(y)) y = year; }
+  else if (local) { [, d, m, y] = local; if (/yyyy/i.test(y)) y = year; else if (y.length === 2) y = `20${y}`; }
   else if (named) { d = named[1]; m = String(months.indexOf(named[2].slice(0, 3).toLowerCase()) + 1); y = named[3] || year; }
+  else if (monthFirst) { m = String(months.indexOf(monthFirst[1].slice(0, 3).toLowerCase()) + 1); d = monthFirst[2]; y = monthFirst[3] || year; }
+  if (y.length === 2) y = `20${y}`;
   if (!/^\d{4}$/.test(y) || +m < 1 || +m > 12 || +d < 1) return "";
   const result = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   const parsed = new Date(`${result}T00:00:00Z`);
@@ -42,7 +45,7 @@ export function journalIssues(j: JournalDraft): string[] {
   if (!j.description.trim()) issues.push("Add a journal narration.");
   if (j.amount === null || !Number.isFinite(j.amount) || j.amount <= 0) issues.push("Confirm a positive source transaction amount.");
   if (j.lines.length < 2) issues.push("At least two journal lines are required.");
-  if (j.lines.some((l) => !l.accountCode.trim() || !l.accountName.trim())) issues.push("Map every line to an account code and account name.");
+  if (j.lines.some((l) => !l.accountCode.trim() || !l.accountName.trim() || /confirm|classify|determine|identify|establish/i.test(l.accountName))) issues.push("Map every line to a confirmed account code and account name.");
   if (j.lines.some((l) => !Number.isFinite(l.debit) || !Number.isFinite(l.credit) || l.debit < 0 || l.credit < 0 || (l.debit > 0 && l.credit > 0) || (l.debit === 0 && l.credit === 0))) issues.push("Each line needs one positive debit or credit, with no negative amounts.");
   if (totals.difference !== 0) issues.push(`Debits and credits differ by ${totals.difference.toFixed(2)}.`);
   if (totals.debit <= 0) issues.push("The journal total must be greater than zero.");
@@ -57,7 +60,6 @@ export function worksheetIssues(w: AccountingWorksheet) {
   const included = w.journals.filter((j) => j.included);
   const issues: string[] = [];
   if (!included.length) issues.push("Select at least one transaction.");
-  if (!w.businessEvidenceConfirmed) issues.push("Confirm these entries relate to actual company transactions. Training examples are not business evidence.");
   for (const j of included) {
     issues.push(...journalIssues(j).map((s) => `${j.reference || j.id}: ${s}`));
     if (!j.confirmed) issues.push(`${j.reference || j.id}: Review and confirm the evidence, accounts, date, amount and treatment.`);
@@ -83,7 +85,7 @@ function line(code: string, name: string, amount: number, debit: boolean, descri
 }
 
 export function blankJournal(id = "manual-1"): JournalDraft {
-  return { id, reference: "", date: todayKualaLumpur(), rawDate: "", currency: "MYR", currencyRate: 1, party: "", description: "", kind: "JOURNAL", recommendedModule: "General ledger journal", amount: null, taxAmount: null, taxTreatment: "unreviewed", lines: [line("", "", 0, true, ""), line("", "", 0, false, "")], treatment: "Accountant to determine treatment from the source evidence.", standards: [], evidence: { page: 1, excerpt: "" }, assumptions: [], included: true, confirmed: false, source: "manual" };
+  return { id, reference: "", date: todayKualaLumpur(), rawDate: "", currency: "MYR", currencyRate: 1, party: "", description: "", kind: "JOURNAL", recommendedModule: "General ledger journal", amount: null, taxAmount: null, taxTreatment: "unreviewed", lines: [line("", "", 0, true, ""), line("", "", 0, false, "")], treatment: "", standards: [], evidence: { page: 1, excerpt: "" }, assumptions: [], included: true, confirmed: false, source: "manual" };
 }
 
 function cashAccount(text: string) {
@@ -105,7 +107,7 @@ function sourceAccountDetails(body: string) {
 function tableJournals(doc: ExtractedDocument): JournalDraft[] {
   const pages = doc.source_pages?.length ? doc.source_pages : [{ page: 1, text: doc.source_text || "" }];
   const result: JournalDraft[] = [];
-  const datePattern = "\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:[a-z]*)(?:\\s+\\d{4})?|\\d{4}-\\d{2}-\\d{2}";
+  const datePattern = "\\d{1,2}[/-]\\d{1,2}[/-](?:\\d{2,4}|yyyy)|\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:[a-z]*)(?:,?\\s+\\d{2,4})?|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:[a-z]*)\\s+\\d{1,2},?\\s+\\d{2,4}|\\d{4}-\\d{2}-\\d{2}";
   for (const page of pages) {
     const rows = [...page.text.matchAll(new RegExp(`\\b((?:PI|PV|OR|JV|CN|PR|I)-\\d{4,})(?:\\s+(?:I|PI)-\\d{4,})?\\s+(${datePattern})\\b`, "gi"))];
     for (let i = 0; i < rows.length; i++) {
